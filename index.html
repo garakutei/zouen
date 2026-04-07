@@ -348,7 +348,8 @@ let GAS_URL=localStorage.getItem('gasUrl')||'';
 let DEMO_MODE=false;
 let customers=[];
 let allRecords=[];
-let planData={};
+let planData={};   // {お客様名: [{月, 作業内容, 注意事項, isOverride}]}
+let currentYear=String(new Date().getFullYear());
 let currentCustomer=null;
 let selectedPeriod=null;
 let visitItems=[];
@@ -364,13 +365,45 @@ const DEMO_CUSTOMERS=[
   {お客様名:'鈴木様（宮城野区）',地区:'宮城野区',住所:'宮城野区鶴ケ谷2-8',tel1:'022-251-0004',tel2:'',email:'suzuki@example.com',memo:'',順:4,dist:'約12km'},
   {お客様名:'高橋様（若林区）',地区:'若林区',住所:'若林区荒井3-1-2',tel1:'',tel2:'070-9012-3456',email:'',memo:'平日午前のみ在宅。',順:5,dist:'約15km'},
 ];
-const DEMO_PLANS={
-  '田中様（泉区）':[3,5,6,'8a',9,10,11],
-  '佐藤様（青葉区）':[2,4,5,6,7,'8b',9,10,11],
-  '鈴木様（宮城野区）':[4,5,6,9,10,11],
-  '高橋様（若林区）':[3,5,6,10,11],
-  '伊藤様（太白区）':[4,5,'8a',9,10],
-};
+// 基本計画：{お客様, 月, 作業内容, 注意事項}
+const DEMO_PLANS_BASE=[
+  {お客様:'田中様（泉区）',月:'3', 作業内容:'雪囲い取除き',注意事項:''},
+  {お客様:'田中様（泉区）',月:'5', 作業内容:'剪定',        注意事項:'お盆前に完了'},
+  {お客様:'田中様（泉区）',月:'6', 作業内容:'消毒',        注意事項:''},
+  {お客様:'田中様（泉区）',月:'8a',作業内容:'剪定',        注意事項:'お盆前に必ず完了'},
+  {お客様:'田中様（泉区）',月:'9', 作業内容:'剪定',        注意事項:''},
+  {お客様:'田中様（泉区）',月:'10',作業内容:'剪定',        注意事項:''},
+  {お客様:'田中様（泉区）',月:'11',作業内容:'雪囲い',      注意事項:'縄の在庫確認'},
+  {お客様:'佐藤様（青葉区）',月:'2', 作業内容:'雪囲い取除き',注意事項:''},
+  {お客様:'佐藤様（青葉区）',月:'4', 作業内容:'剪定',        注意事項:''},
+  {お客様:'佐藤様（青葉区）',月:'5', 作業内容:'消毒',        注意事項:''},
+  {お客様:'佐藤様（青葉区）',月:'6', 作業内容:'剪定',        注意事項:''},
+  {お客様:'佐藤様（青葉区）',月:'7', 作業内容:'剪定',        注意事項:''},
+  {お客様:'佐藤様（青葉区）',月:'8b',作業内容:'剪定',        注意事項:''},
+  {お客様:'佐藤様（青葉区）',月:'9', 作業内容:'剪定',        注意事項:''},
+  {お客様:'佐藤様（青葉区）',月:'10',作業内容:'剪定',        注意事項:''},
+  {お客様:'佐藤様（青葉区）',月:'11',作業内容:'雪囲い',      注意事項:''},
+  {お客様:'鈴木様（宮城野区）',月:'4', 作業内容:'剪定',注意事項:''},
+  {お客様:'鈴木様（宮城野区）',月:'5', 作業内容:'消毒',注意事項:''},
+  {お客様:'鈴木様（宮城野区）',月:'6', 作業内容:'剪定',注意事項:''},
+  {お客様:'鈴木様（宮城野区）',月:'9', 作業内容:'剪定',注意事項:''},
+  {お客様:'鈴木様（宮城野区）',月:'10',作業内容:'剪定',注意事項:''},
+  {お客様:'鈴木様（宮城野区）',月:'11',作業内容:'雪囲い',注意事項:''},
+  {お客様:'高橋様（若林区）',月:'3', 作業内容:'雪囲い取除き',注意事項:''},
+  {お客様:'高橋様（若林区）',月:'5', 作業内容:'消毒',        注意事項:''},
+  {お客様:'高橋様（若林区）',月:'6', 作業内容:'消毒',        注意事項:''},
+  {お客様:'高橋様（若林区）',月:'10',作業内容:'剪定',        注意事項:''},
+  {お客様:'高橋様（若林区）',月:'11',作業内容:'雪囲い',      注意事項:''},
+  {お客様:'伊藤様（太白区）',月:'4', 作業内容:'剪定',        注意事項:''},
+  {お客様:'伊藤様（太白区）',月:'5', 作業内容:'消毒',        注意事項:''},
+  {お客様:'伊藤様（太白区）',月:'8a',作業内容:'剪定',        注意事項:'お盆前に完了'},
+  {お客様:'伊藤様（太白区）',月:'9', 作業内容:'剪定',        注意事項:''},
+  {お客様:'伊藤様（太白区）',月:'10',作業内容:'剪定',        注意事項:''},
+];
+// 年度別計画：その年だけ違う内容
+const DEMO_PLANS_YEAR=[
+  {年度:'2026',お客様:'田中様（泉区）',月:'5',作業内容:'剪定・消毒',注意事項:'今年は消毒も追加',isOverride:true},
+];
 const DEMO_RECORDS=[
   {お客様:'田中様（泉区）',作業日:'2023-03-10',年:'2023',作業内容:'剪定',作業者:'佐藤',時間:4,分:0,メモ:'松・梅'},
   {お客様:'田中様（泉区）',作業日:'2023-03-10',年:'2023',作業内容:'剪定',作業者:'田中',時間:4,分:0,メモ:''},
@@ -434,9 +467,9 @@ function getAvgStay(customer,type){
 function getThisMonth(){
   const now=new Date(),tm=now.getMonth()+1;
   return customers.filter(c=>{
-    const p=planData[c['お客様名']]||[];
-    if(tm===8) return p.includes('8a')||p.includes('8b');
-    return p.includes(tm);
+    const months=getPlanMonths(c['お客様名']);
+    if(tm===8) return months.includes('8a')||months.includes('8b');
+    return months.includes(tm);
   }).sort((a,b)=>(Number(a['順'])||9)-(Number(b['順'])||9));
 }
 
@@ -512,6 +545,17 @@ function demoApi(p){
     DEMO_RECORDS.push(rec);allRecords.push(rec);
     return Promise.resolve({success:true});
   }
+  if(p.action==='getPlans'){
+    const yr=p.year||String(new Date().getFullYear());
+    // 基本計画をベースに年度別でマージ
+    const merged=[...DEMO_PLANS_BASE];
+    DEMO_PLANS_YEAR.filter(y=>String(y['年度'])===yr).forEach(yp=>{
+      const idx=merged.findIndex(b=>b['お客様']===yp['お客様']&&String(b['月'])===String(yp['月']));
+      if(idx>=0) merged[idx]={...merged[idx],...yp,isOverride:true};
+      else merged.push({...yp,isOverride:true});
+    });
+    return Promise.resolve({plans:merged,year:yr});
+  }
   return Promise.resolve({});
 }
 
@@ -528,9 +572,33 @@ function startApp(){
 async function refreshAll(){
   customers=await api({action:'getCustomers'});
   allRecords=await api({action:'getRecords'});
-  planData=DEMO_PLANS;
+  // 年間計画を読み込む（基本＋年度別マージ済み）
+  const planResult=await api({action:'getPlans',year:currentYear});
+  buildPlanData(planResult);
   renderList('');
   if(currentCustomer) renderDetail(currentCustomer);
+}
+
+function buildPlanData(planResult){
+  // planResultはGASから {plans:[...], year:'2026'} または demoApiから同形式
+  const plans=Array.isArray(planResult)?planResult:(planResult.plans||[]);
+  planData={};
+  plans.forEach(p=>{
+    const name=p['お客様'];
+    if(!planData[name]) planData[name]=[];
+    planData[name].push({月:String(p['月']),作業内容:p['作業内容']||'',注意事項:p['注意事項']||'',isOverride:!!p['isOverride']});
+  });
+}
+
+// お客様の予定月リスト（月キーの配列）を返す
+function getPlanMonths(name){
+  return (planData[name]||[]).map(p=>isNaN(p.月)?p.月:Number(p.月));
+}
+
+// 特定の月の計画詳細を返す
+function getPlanDetail(name, monthKey){
+  const mk=String(monthKey);
+  return (planData[name]||[]).find(p=>String(p.月)===mk)||null;
 }
 
 window.onload=()=>{if(GAS_URL){document.getElementById('gas-url-input').value=GAS_URL;connectGAS();}};
@@ -560,6 +628,7 @@ function renderList(q){
   document.getElementById('s-rec').textContent=allRecords.length;
   const filtered=customers.filter(c=>!q||c['お客様名'].includes(q)||c['地区'].includes(q)||(c['tel1']&&c['tel1'].includes(q))||(c['tel2']&&c['tel2'].includes(q)));
   const monthly=getThisMonth().map(c=>c['お客様名']);
+  const now2=new Date(),tm2=now2.getMonth()+1;
   document.getElementById('customer-list').innerHTML=filtered.map(c=>{
     const name=c['お客様名'];
     const cSites=sites.filter(s=>s.c===name);
@@ -613,22 +682,41 @@ function renderDetail(name){
     </div>
     <div class="slabel" style="margin-top:0">作業内容ごとの平均滞在時間</div>
     <div style="display:flex;flex-wrap:wrap;gap:4px">${typeSummary||'<span style="font-size:12px;color:#aaa">記録なし</span>'}</div>`;
-  const plan=planData[name]||[];
+  const planMonths=getPlanMonths(name);
   let html='<div class="month-grid">';
   MNUMS.forEach((mk,i)=>{
     if(mk==='8a'||mk==='8b') return;
     const has=cSites.some(s=>getPeriod(s.d)===mk);
+    const planned=planMonths.includes(mk)||planMonths.includes(Number(mk));
+    const detail=getPlanDetail(name,mk);
     const sel=selectedPeriod===mk;
-    html+=`<div class="mcell ${has?'done':plan.includes(mk)?'planned':''}${sel?' sel':''}" onclick="selectPeriod(${JSON.stringify(mk)})">${MONTHS[i]}</div>`;
+    const overrideMark=detail&&detail.isOverride?'★':'';
+    html+=`<div class="mcell ${has?'done':planned?'planned':''}${sel?' sel':''}" onclick="selectPeriod(${JSON.stringify(mk)})" title="${detail?detail.作業内容+(detail.注意事項?' / '+detail.注意事項:''):''}">${MONTHS[i]}${overrideMark?'<br><span style=\"font-size:9px\">'+overrideMark+'</span>':''}</div>`;
   });
   html+='</div><div class="slabel">8月（お盆前後）</div><div class="aug-grid">';
   ['8a','8b'].forEach(k=>{
     const has=cSites.some(s=>getPeriod(s.d)===k);
+    const planned=planMonths.includes(k);
+    const detail=getPlanDetail(name,k);
     const sel=selectedPeriod===k;
     const lbl=k==='8a'?'8月前半\n（お盆前〜13日）':'8月後半\n（お盆後14日〜）';
-    html+=`<div class="acell ${has?'done':plan.includes(k)?'planned':''}${sel?' sel':''}" onclick="selectPeriod('${k}')">${lbl}</div>`;
+    const overrideMark=detail&&detail.isOverride?'★':'';
+    html+=`<div class="acell ${has?'done':planned?'planned':''}${sel?' sel':''}" onclick="selectPeriod('${k}')">${lbl}${overrideMark?'\n'+overrideMark:''}</div>`;
   });
   html+='</div>';
+  // 選択中の月の計画詳細を表示
+  if(selectedPeriod!==null){
+    const det=getPlanDetail(name,selectedPeriod);
+    if(det){
+      html+=`<div style="background:${det.isOverride?'#FAEEDA':'#EAF3DE'};border-radius:10px;padding:10px 14px;margin-top:4px;font-size:12px">
+        <div style="font-weight:600;color:${det.isOverride?'#854F0B':'#3B6D11'};margin-bottom:4px">
+          ${det.isOverride?'★ '+currentYear+'年度の計画（変更あり）':'📋 基本計画'}
+        </div>
+        <div>作業内容：<strong>${det.作業内容||'—'}</strong></div>
+        ${det.注意事項?'<div style="margin-top:4px;color:#854F0B">⚠ 注意：'+det.注意事項+'</div>':''}
+      </div>`;
+    }
+  }
   document.getElementById('schedule-grid').innerHTML=html;
   renderRecords(name,selectedPeriod);
 }
