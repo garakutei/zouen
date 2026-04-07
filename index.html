@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>造園管理アプリ</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic UI',sans-serif;font-size:14px;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
+
+/* ── 設定画面 ── */
+#setup-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
+.setup-card{background:#fff;border-radius:16px;padding:2rem;max-width:500px;width:100%;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+.setup-card h1{font-size:20px;font-weight:700;margin-bottom:6px}
+.setup-card p{font-size:13px;color:#666;margin-bottom:1.5rem;line-height:1.7}
+
+/* ── レイアウト ── */
+#main-screen{display:none}
+.header{background:#fff;border-bottom:1px solid #e0e0da;position:sticky;top:0;z-index:200}
+.header-top{display:flex;align-items:center;padding:10px 1rem;gap:10px}
+.app-logo{font-size:16px;font-weight:700;color:#1a1a1a;flex:1}
+.sync-btn{font-size:11px;padding:4px 10px;border:1px solid #ddd;border-radius:20px;cursor:pointer;background:#fff;color:#888}
+.tabs{display:flex;overflow-x:auto;padding:0 0.5rem}
+.tab{padding:10px 12px;font-size:13px;cursor:pointer;border:none;background:none;color:#999;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;flex-shrink:0}
+.tab.active{color:#1a1a1a;border-bottom:2px solid #1a1a1a;font-weight:700}
+.content{padding:1rem;max-width:960px;margin:0 auto}
+
+/* ── カード ── */
+.card{background:#fff;border-radius:12px;padding:1rem 1.25rem;margin-bottom:10px;border:1px solid #e8e8e4}
+.card-tap{cursor:pointer}
+.card-tap:active{background:#f9f9f7}
+
+/* ── バッジ ── */
+.badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;display:inline-block}
+.bg{background:#EAF3DE;color:#3B6D11}.ba{background:#FAEEDA;color:#854F0B}
+.bb{background:#E6F1FB;color:#185FA5}.bc{background:#F1EFE8;color:#5F5E5A}
+
+/* ── ボタン ── */
+.btn{padding:8px 16px;font-size:13px;border:1px solid #ddd;border-radius:10px;cursor:pointer;background:#fff;color:#1a1a1a;font-weight:500}
+.btn:active{background:#f5f5f0}
+.btnp{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btnp:active{opacity:0.85}
+.btnsm{padding:5px 12px;font-size:12px}
+.btn-call{background:#EAF3DE;color:#3B6D11;border-color:#C0DD97}
+.btn-sms{background:#E6F1FB;color:#185FA5;border-color:#B5D4F4}
+.btn-sms2{background:#FAEEDA;color:#854F0B;border-color:#FAC775}
+
+/* ── フォーム ── */
+input[type=text],input[type=tel],input[type=date],input[type=number],select,textarea{
+  padding:9px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;
+  background:#fff;color:#1a1a1a;width:100%;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-shadow:0 0 0 3px rgba(59,109,17,0.1)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.flabel{font-size:11px;color:#888;margin-bottom:4px;font-weight:500}
+
+/* ── 統計 ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1.25rem}
+.stat{background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #e8e8e4}
+.stat-num{font-size:20px;font-weight:700}.stat-lbl{font-size:10px;color:#888;margin-top:2px}
+
+/* ── スケジュール ── */
+.slabel{font-size:11px;color:#888;margin-bottom:6px;font-weight:600;margin-top:14px}
+.month-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:8px}
+.aug-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:1rem}
+.mcell,.acell{text-align:center;border-radius:8px;font-size:11px;border:1px solid #e8e8e4;cursor:pointer;background:#fff;color:#1a1a1a}
+.mcell{padding:5px 3px;line-height:1.4}.acell{padding:9px 5px;line-height:1.6;white-space:pre-line}
+.mcell.done,.acell.done{background:#EAF3DE;color:#3B6D11;border-color:#C0DD97;font-weight:600}
+.mcell.planned,.acell.planned{background:#F1EFE8;color:#5F5E5A}
+.mcell.sel,.acell.sel{border:2px solid #1a1a1a}
+
+/* ── 記録 ── */
+.dpanel{background:#f9f9f7;border-radius:10px;padding:1rem;margin-top:1rem}
+.site-group{border:1px solid #e8e8e4;border-radius:10px;margin-bottom:10px;overflow:hidden;background:#fff}
+.site-head{padding:9px 12px;background:#f9f9f7;border-bottom:1px solid #e8e8e4}
+.worker-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:11px;background:#F1EFE8;color:#5F5E5A;margin:3px}
+
+/* ── 実績 ── */
+.avg-table{width:100%;border-collapse:collapse}
+.avg-table th{font-size:11px;font-weight:600;color:#888;text-align:left;padding:6px 8px;border-bottom:1px solid #eee}
+.avg-table td{font-size:12px;padding:7px 8px;border-bottom:1px solid #eee}
+.avg-table tr:last-child td{border-bottom:none}
+.avg-bar{height:6px;border-radius:3px;background:#C0DD97;display:inline-block;vertical-align:middle}
+
+/* ── 翌日計画 ── */
+.plan-box{background:#fff;border-radius:12px;padding:1rem 1.25rem;border:1px solid #e8e8e4;margin-bottom:1rem}
+.near-list{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.near-chip{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:10px;border:1px solid #e8e8e4;background:#fff;gap:8px;flex-wrap:wrap}
+.near-chip.added{border-color:#C0DD97;background:#EAF3DE}
+.dist-badge{font-size:10px;padding:2px 7px;border-radius:20px;background:#F1EFE8;color:#5F5E5A;white-space:nowrap;flex-shrink:0}
+.visit-item{border:1px solid #e8e8e4;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff}
+.visit-selects{display:flex;flex-direction:column;gap:8px;flex:1;min-width:0}
+.info-box{background:#E6F1FB;border-radius:8px;padding:8px 12px;font-size:12px;color:#185FA5;margin-top:8px;line-height:1.7}
+.info-box.warn{background:#FAEEDA;color:#854F0B}
+.sched-card{border:1px solid #e8e8e4;border-radius:10px;margin-bottom:8px;overflow:hidden}
+.sched-head{padding:9px 12px;background:#f9f9f7;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.sched-body{padding:9px 12px}
+.route-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#1a1a1a;color:#fff;font-size:11px;font-weight:700;flex-shrink:0}
+.worker-tag{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;margin:2px 2px 0 0}
+
+/* ── 検索 ── */
+.cust-search{position:relative}
+.cust-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:10px;max-height:220px;overflow-y:auto;z-index:300;display:none;box-shadow:0 4px 16px rgba(0,0,0,0.12);margin-top:3px}
+.cust-dropdown.open{display:block}
+.cust-option{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f5f5f0}
+.cust-option:last-child{border-bottom:none}
+.cust-option:hover{background:#f5f5f0}
+
+/* ── 連絡 ── */
+.contact-bar{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.contact-btn{display:inline-flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #ddd;text-decoration:none;flex:1;min-width:100px;text-align:center;line-height:1.4}
+.sms-panel{background:#f9f9f7;border-radius:10px;padding:1rem;margin-top:10px;border:1px solid #e8e8e4}
+.tpl-chip{display:inline-block;padding:5px 11px;border-radius:20px;font-size:12px;border:1px solid #ddd;cursor:pointer;margin:3px;background:#fff}
+.tpl-chip:hover{background:#f5f5f0}
+.info-row{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #f0f0ec;font-size:13px;align-items:flex-start}
+.info-row:last-child{border-bottom:none}
+.info-label{min-width:80px;font-size:11px;color:#888;font-weight:500;padding-top:2px}
+
+/* ── 作業者入力 ── */
+.worker-input-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #f0f0ec;background:#fff}
+.worker-input-row:last-child{border-bottom:none}
+.time-sel{display:flex;gap:4px}
+.time-sel select{padding:6px 8px;font-size:12px;width:auto}
+
+/* ── ローディング ── */
+.loading{text-align:center;padding:2rem;color:#888;font-size:13px}
+.spinner{width:24px;height:24px;border:2px solid #eee;border-top:2px solid #3B6D11;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.hidden{display:none}
+.top-bar{display:flex;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+.page-title{font-size:15px;font-weight:600;flex:1}
+.search{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;margin-bottom:1rem;background:#fff}
+.search:focus{outline:none;border-color:#3B6D11;box-shadow:0 0 0 3px rgba(59,109,17,0.1)}
+
+@media(max-width:480px){
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .frow{grid-template-columns:1fr}
+  .contact-btn{min-width:80px;font-size:12px;padding:8px 8px}
+}
+</style>
+</head>
+<body>
+
+<!-- 設定画面 -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h1>🌿 造園管理アプリ</h1>
+    <p>Googleスプレッドシートと連携して、お客様情報・作業記録・翌日計画を一元管理できます。</p>
+    <div class="flabel">Google Apps Script URL</div>
+    <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/xxxxx/exec" style="margin-bottom:12px"/>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn btnp" onclick="connectGAS()" style="flex:1">接続する</button>
+      <button class="btn" onclick="useDemoMode()" style="flex:1">デモモードで試す</button>
+    </div>
+    <div id="connect-error" style="color:#A32D2D;font-size:12px;display:none"></div>
+  </div>
+</div>
+
+<!-- メイン画面 -->
+<div id="main-screen">
+  <div class="header">
+    <div class="header-top">
+      <div class="app-logo">🌿 造園管理</div>
+      <span id="demo-badge" class="badge bc hidden">デモ</span>
+      <button class="sync-btn" onclick="refreshAll()">↻ 同期</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('list')">お客様一覧</button>
+      <button class="tab" onclick="showTab('detail')">作業記録</button>
+      <button class="tab" onclick="showTab('add')">記録追加</button>
+      <button class="tab" onclick="showTab('stats')">実績分析</button>
+      <button class="tab" onclick="showTab('plan')">翌日計画</button>
+      <button class="tab" onclick="showTab('config')">設定</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- お客様一覧 -->
+    <div id="tab-list">
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-num" id="s-total">—</div><div class="stat-lbl">契約件数</div></div>
+        <div class="stat"><div class="stat-num" id="s-month">—</div><div class="stat-lbl">今月予定</div></div>
+        <div class="stat"><div class="stat-num" id="s-done">—</div><div class="stat-lbl">今年完了</div></div>
+        <div class="stat"><div class="stat-num" id="s-rec">—</div><div class="stat-lbl">総記録件数</div></div>
+      </div>
+      <input class="search" type="text" placeholder="お客様名・地区・電話番号で検索..." oninput="filterList(this.value)"/>
+      <div id="customer-list"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+    </div>
+
+    <!-- 作業記録 -->
+    <div id="tab-detail" class="hidden">
+      <div class="top-bar">
+        <button class="btn btnsm" onclick="showTab('list')">← 一覧</button>
+        <div class="page-title" id="detail-name"></div>
+        <button class="btn btnsm btn-call" onclick="openContact()">📞 連絡</button>
+        <button class="btn btnsm btnp" onclick="openAdd()">+ 記録</button>
+      </div>
+      <div class="card" id="detail-info"></div>
+      <div id="contact-panel" class="hidden"></div>
+      <div class="slabel">年間スケジュール（緑＝完了　グレー＝予定のみ）</div>
+      <div id="schedule-grid"></div>
+      <div class="dpanel" id="detail-records"></div>
+    </div>
+
+    <!-- 記録追加 -->
+    <div id="tab-add" class="hidden">
+      <div class="top-bar">
+        <button class="btn btnsm" onclick="showTab('detail')">← 戻る</button>
+        <div class="page-title">作業記録を追加</div>
+      </div>
+      <div class="card">
+        <div class="frow">
+          <div><div class="flabel">お客様</div><select id="f-customer" style="width:100%" onchange="updateAddPreview()"></select></div>
+          <div><div class="flabel">作業日</div><input type="date" id="f-date"/></div>
+        </div>
+        <div style="margin-bottom:12px">
+          <div class="flabel">作業内容</div>
+          <select id="f-type" style="width:100%" onchange="updateAddPreview()">
+            <option>剪定</option><option>雪囲い</option><option>雪囲い取除き</option><option>消毒</option>
+          </select>
+        </div>
+        <div class="slabel" style="margin-top:0">作業者ごとに時間を入力</div>
+        <div style="border:1px solid #e8e8e4;border-radius:10px;overflow:hidden;margin-bottom:8px">
+          <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:6px 10px;background:#f9f9f7;border-bottom:1px solid #e8e8e4">
+            <div class="flabel" style="margin:0">作業者名</div>
+            <div class="flabel" style="margin:0;text-align:center">作業時間</div>
+            <div style="width:32px"></div>
+          </div>
+          <div id="add-worker-list"></div>
+        </div>
+        <button class="btn btnsm" style="width:100%;margin-bottom:12px" onclick="addWorkerRow()">＋ 作業者を追加</button>
+        <div id="add-preview" class="info-box" style="display:none;margin-bottom:12px"></div>
+        <div style="margin-bottom:16px">
+          <div class="flabel">メモ・特記事項</div>
+          <input type="text" id="f-note" placeholder="脚立使用、薬剤名 など"/>
+        </div>
+        <div id="save-status" style="font-size:12px;color:#3B6D11;margin-bottom:8px;display:none">保存中...</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btnp" id="save-btn" onclick="saveRecord()">保存する</button>
+          <button class="btn" onclick="showTab('detail')">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 実績分析 -->
+    <div id="tab-stats" class="hidden">
+      <div class="top-bar"><div class="page-title">作業実績分析（3年分）</div></div>
+      <div class="frow" style="margin-bottom:1rem">
+        <div><div class="flabel">お客様で絞り込み</div>
+          <select id="stat-customer" style="width:100%" onchange="renderStats()"><option value="">全お客様</option></select>
+        </div>
+        <div><div class="flabel">年で絞り込み</div>
+          <select id="stat-year" style="width:100%" onchange="renderStats()">
+            <option value="">全年</option>
+            <option value="2023">2023年</option><option value="2024">2024年</option>
+            <option value="2025">2025年</option><option value="2026">2026年</option>
+          </select>
+        </div>
+      </div>
+      <div id="stats-content"><div class="loading"><div class="spinner"></div>集計中...</div></div>
+    </div>
+
+    <!-- 翌日計画 -->
+    <div id="tab-plan" class="hidden">
+      <div class="top-bar"><div class="page-title">翌日作業計画</div></div>
+      <div class="plan-box">
+        <div class="frow">
+          <div><div class="flabel">作業日</div><input type="date" id="plan-date"/></div>
+          <div><div class="flabel">開始時刻</div>
+            <select id="plan-start">
+              <option value="420">7:00</option><option value="450">7:30</option>
+              <option value="480" selected>8:00</option><option value="510">8:30</option><option value="540">9:00</option>
+            </select>
+          </div>
+        </div>
+        <div class="frow">
+          <div><div class="flabel">出発地</div><input type="text" id="plan-base" value="泉区長命ヶ丘"/></div>
+          <div><div class="flabel">当日の作業人数</div>
+            <select id="plan-workers" onchange="renderNearList();renderVisitList()">
+              <option value="1">1人</option><option value="2" selected>2人</option>
+              <option value="3">3人</option><option value="4">4人</option><option value="5">5人</option>
+            </select>
+          </div>
+        </div>
+        <div class="slabel" style="margin-top:4px">今月予定のお客様 <span style="font-weight:400;color:#aaa">（出発地に近い順）</span></div>
+        <div class="near-list" id="near-list"></div>
+        <div style="margin-bottom:12px">
+          <div class="flabel">予定外のお客様を追加（名前で検索）</div>
+          <div class="cust-search">
+            <input type="text" id="other-search" placeholder="お客様名を入力..." oninput="searchOther(this.value)" onfocus="searchOther(this.value)" autocomplete="off"/>
+            <div class="cust-dropdown" id="other-dropdown"></div>
+          </div>
+        </div>
+        <div class="slabel" style="margin-top:4px">選択した訪問先</div>
+        <div id="visit-list"></div>
+        <div id="visit-empty" style="font-size:12px;color:#aaa;text-align:center;padding:10px 0 4px">上のリストからお客様を追加してください</div>
+        <button class="btn btnp" style="width:100%;margin-top:14px" onclick="generatePlan()">計画を作成する</button>
+      </div>
+      <div id="plan-result"></div>
+    </div>
+
+    <!-- 設定 -->
+    <div id="tab-config" class="hidden">
+      <div class="top-bar"><div class="page-title">設定</div></div>
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px">Google Apps Script URL</div>
+        <div id="current-url" style="font-size:11px;color:#aaa;word-break:break-all;padding:4px 8px;background:#f5f5f0;border-radius:6px">未設定</div>
+        <div style="margin-top:12px">
+          <input type="text" id="new-url-input" placeholder="新しいURLを入力..." style="margin-bottom:8px"/>
+          <button class="btn btnp" style="width:100%" onclick="updateURL()">URLを更新して再接続</button>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px">データ同期</div>
+        <button class="btn" style="width:100%" onclick="refreshAll()">全データを再読み込み</button>
+      </div>
+      <div class="card">
+        <div id="mode-display" style="font-size:12px;color:#888;margin-bottom:8px"></div>
+        <button class="btn" onclick="goSetup()" style="width:100%">接続設定に戻る</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 定数
+// ============================================================
+const MONTHS=['1月','2月','3月','4月','5月','6月','7月','8月前','8月後','9月','10月','11月','12月'];
+const MNUMS=[1,2,3,4,5,6,7,'8a','8b',9,10,11,12];
+const WORK_TYPES=['剪定','雪囲い','雪囲い取除き','消毒'];
+const WCOLORS=['#E6F1FB','#EAF3DE','#FAEEDA','#FBEAF0','#F1EFE8'];
+const WTEXTS=['#185FA5','#3B6D11','#854F0B','#993556','#5F5E5A'];
+const SMS_TEMPLATES=[
+  {label:'作業前日のご連絡',text:n=>`${n}様\nいつもお世話になっております。\n明日、お庭の作業にお伺いする予定です。\nよろしくお願いいたします。`},
+  {label:'作業当日のご連絡',text:n=>`${n}様\nおはようございます。\n本日、これよりお伺いいたします。\nよろしくお願いいたします。`},
+  {label:'作業完了のご報告',text:n=>`${n}様\n本日の作業が完了いたしました。\nありがとうございました。\nまたよろしくお願いいたします。`},
+  {label:'日程変更のご連絡',text:n=>`${n}様\nいつもお世話になっております。\n誠に恐れ入りますが、天候の都合により作業日程の変更をお願いしたく、ご連絡いたしました。\nご都合をお聞かせいただけますでしょうか。`},
+  {label:'見積りのご連絡',text:n=>`${n}様\nお問い合わせいただきありがとうございます。\n現地確認のうえ、お見積りをご提示いたします。\nご都合のよい日時をお教えください。`},
+];
+
+// ============================================================
+// 状態
+// ============================================================
+let GAS_URL=localStorage.getItem('gasUrl')||'';
+let DEMO_MODE=false;
+let customers=[];
+let allRecords=[];
+let planData={};
+let currentCustomer=null;
+let selectedPeriod=null;
+let visitItems=[];
+let addWorkers=[{name:'',h:3,m:0}];
+
+// ============================================================
+// デモデータ
+// ============================================================
+const DEMO_CUSTOMERS=[
+  {お客様名:'田中様（泉区）',地区:'泉区',住所:'泉区泉中央1-5-3',tel1:'022-771-0001',tel2:'090-1234-5678',email:'tanaka@example.com',memo:'駐車場あり。犬がいるので要注意。',順:1,dist:'約5km'},
+  {お客様名:'伊藤様（太白区）',地区:'太白区',住所:'太白区長町南5-7',tel1:'022-304-0002',tel2:'090-3456-7890',email:'ito@example.com',memo:'カーポートに駐車可。',順:2,dist:'約8km'},
+  {お客様名:'佐藤様（青葉区）',地区:'青葉区',住所:'青葉区中山4-2-1',tel1:'022-279-0003',tel2:'080-5678-9012',email:'',memo:'インターホンなし。直接玄関へ。',順:3,dist:'約10km'},
+  {お客様名:'鈴木様（宮城野区）',地区:'宮城野区',住所:'宮城野区鶴ケ谷2-8',tel1:'022-251-0004',tel2:'',email:'suzuki@example.com',memo:'',順:4,dist:'約12km'},
+  {お客様名:'高橋様（若林区）',地区:'若林区',住所:'若林区荒井3-1-2',tel1:'',tel2:'070-9012-3456',email:'',memo:'平日午前のみ在宅。',順:5,dist:'約15km'},
+];
+const DEMO_PLANS={
+  '田中様（泉区）':[3,5,6,'8a',9,10,11],
+  '佐藤様（青葉区）':[2,4,5,6,7,'8b',9,10,11],
+  '鈴木様（宮城野区）':[4,5,6,9,10,11],
+  '高橋様（若林区）':[3,5,6,10,11],
+  '伊藤様（太白区）':[4,5,'8a',9,10],
+};
+const DEMO_RECORDS=[
+  {お客様:'田中様（泉区）',作業日:'2023-03-10',年:'2023',作業内容:'剪定',作業者:'佐藤',時間:4,分:0,メモ:'松・梅'},
+  {お客様:'田中様（泉区）',作業日:'2023-03-10',年:'2023',作業内容:'剪定',作業者:'田中',時間:4,分:0,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2023-11-15',年:'2023',作業内容:'雪囲い',作業者:'佐藤',時間:3,分:0,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2023-11-15',年:'2023',作業内容:'雪囲い',作業者:'田中',時間:3,分:0,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2024-03-14',年:'2024',作業内容:'雪囲い取除き',作業者:'佐藤',時間:2,分:30,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2024-03-14',年:'2024',作業内容:'雪囲い取除き',作業者:'田中',時間:2,分:30,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2024-05-22',年:'2024',作業内容:'剪定',作業者:'田中',時間:3,分:20,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2024-05-22',年:'2024',作業内容:'剪定',作業者:'鈴木',時間:3,分:20,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2025-03-15',年:'2025',作業内容:'雪囲い取除き',作業者:'佐藤',時間:2,分:40,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2025-03-15',年:'2025',作業内容:'雪囲い取除き',作業者:'田中',時間:2,分:40,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2025-05-20',年:'2025',作業内容:'剪定',作業者:'田中',時間:3,分:40,メモ:''},
+  {お客様:'田中様（泉区）',作業日:'2025-05-20',年:'2025',作業内容:'剪定',作業者:'鈴木',時間:3,分:40,メモ:''},
+  {お客様:'佐藤様（青葉区）',作業日:'2023-04-12',年:'2023',作業内容:'剪定',作業者:'田中',時間:5,分:0,メモ:''},
+  {お客様:'佐藤様（青葉区）',作業日:'2023-04-12',年:'2023',作業内容:'剪定',作業者:'佐藤',時間:5,分:0,メモ:''},
+  {お客様:'佐藤様（青葉区）',作業日:'2024-04-09',年:'2024',作業内容:'剪定',作業者:'田中',時間:4,分:40,メモ:''},
+  {お客様:'佐藤様（青葉区）',作業日:'2024-04-09',年:'2024',作業内容:'剪定',作業者:'佐藤',時間:4,分:40,メモ:''},
+  {お客様:'佐藤様（青葉区）',作業日:'2025-04-08',年:'2025',作業内容:'剪定',作業者:'田中',時間:5,分:0,メモ:'全体剪定'},
+  {お客様:'佐藤様（青葉区）',作業日:'2025-04-08',年:'2025',作業内容:'剪定',作業者:'佐藤',時間:5,分:0,メモ:''},
+  {お客様:'鈴木様（宮城野区）',作業日:'2023-05-20',年:'2023',作業内容:'剪定',作業者:'田中',時間:2,分:0,メモ:''},
+  {お客様:'鈴木様（宮城野区）',作業日:'2023-05-20',年:'2023',作業内容:'剪定',作業者:'鈴木',時間:2,分:0,メモ:''},
+  {お客様:'鈴木様（宮城野区）',作業日:'2025-05-12',年:'2025',作業内容:'剪定',作業者:'田中',時間:2,分:0,メモ:''},
+  {お客様:'鈴木様（宮城野区）',作業日:'2025-05-12',年:'2025',作業内容:'剪定',作業者:'鈴木',時間:2,分:0,メモ:''},
+  {お客様:'高橋様（若林区）',作業日:'2023-06-15',年:'2023',作業内容:'消毒',作業者:'佐藤',時間:2,分:0,メモ:''},
+  {お客様:'高橋様（若林区）',作業日:'2025-05-25',年:'2025',作業内容:'消毒',作業者:'佐藤',時間:1,分:40,メモ:''},
+  {お客様:'高橋様（若林区）',作業日:'2025-05-25',年:'2025',作業内容:'消毒',作業者:'鈴木',時間:1,分:40,メモ:''},
+  {お客様:'伊藤様（太白区）',作業日:'2023-04-25',年:'2023',作業内容:'剪定',作業者:'田中',時間:6,分:0,メモ:''},
+  {お客様:'伊藤様（太白区）',作業日:'2023-04-25',年:'2023',作業内容:'剪定',作業者:'佐藤',時間:6,分:0,メモ:''},
+  {お客様:'伊藤様（太白区）',作業日:'2025-04-20',年:'2025',作業内容:'剪定',作業者:'田中',時間:6,分:0,メモ:'ツツジ5本'},
+  {お客様:'伊藤様（太白区）',作業日:'2025-04-20',年:'2025',作業内容:'剪定',作業者:'佐藤',時間:6,分:0,メモ:''},
+];
+
+// ============================================================
+// ユーティリティ
+// ============================================================
+function toMin(h,m){return Number(h)*60+Number(m);}
+function fmtH(min){if(!min&&min!==0)return'—';const h=Math.floor(min/60),m=min%60;return m?h+'時間'+m+'分':h+'時間';}
+function fmtClock(min){const h=Math.floor(min/60),m=min%60;return h+':'+(m<10?'0'+m:m);}
+function getPeriod(d){const mo=parseInt(d.split('-')[1]);if(mo!==8)return mo;return parseInt(d.split('-')[2])<=13?'8a':'8b';}
+
+function groupBySite(recs){
+  const map={};
+  recs.forEach(r=>{
+    const key=r['作業日']+'|'+r['お客様']+'|'+r['作業内容'];
+    if(!map[key]) map[key]={d:r['作業日'],c:r['お客様'],t:r['作業内容'],y:r['年'],note:r['メモ']||'',workers:[]};
+    map[key].workers.push({who:r['作業者'],min:toMin(r['時間'],r['分'])});
+  });
+  return Object.values(map).sort((a,b)=>b.d.localeCompare(a.d));
+}
+function siteStayMin(site){return Math.max(...site.workers.map(w=>w.min));}
+
+function getAvgStay(customer,type){
+  let recs=allRecords.filter(r=>r['お客様']===customer&&r['作業内容']===type);
+  if(!recs.length) recs=allRecords.filter(r=>r['作業内容']===type);
+  if(!recs.length) return 0;
+  const sites=groupBySite(recs);
+  const stays=sites.map(s=>siteStayMin(s));
+  return Math.round(stays.reduce((a,b)=>a+b,0)/stays.length);
+}
+
+function getThisMonth(){
+  const now=new Date(),tm=now.getMonth()+1;
+  return customers.filter(c=>{
+    const p=planData[c['お客様名']]||[];
+    if(tm===8) return p.includes('8a')||p.includes('8b');
+    return p.includes(tm);
+  }).sort((a,b)=>(Number(a['順'])||9)-(Number(b['順'])||9));
+}
+
+function defaultType(){
+  const tm=new Date().getMonth()+1;
+  if(tm===11||tm===12) return '雪囲い';
+  if(tm===3||tm===4) return '雪囲い取除き';
+  if(tm===5||tm===6) return '消毒';
+  return '剪定';
+}
+
+// ============================================================
+// GAS接続
+// ============================================================
+async function connectGAS(){
+  const url=document.getElementById('gas-url-input').value.trim();
+  if(!url||!url.includes('script.google.com')){showConnectError('正しいURLを入力してください');return;}
+  try{
+    const data=await fetchGAS(url,{action:'getCustomers'});
+    if(!data||data.error) throw new Error(data?.error||'接続失敗');
+    GAS_URL=url;localStorage.setItem('gasUrl',url);DEMO_MODE=false;startApp();
+  }catch(e){showConnectError('接続できませんでした：'+e.message);}
+}
+function useDemoMode(){DEMO_MODE=true;GAS_URL='';startApp();}
+function showConnectError(msg){const el=document.getElementById('connect-error');el.textContent=msg;el.style.display='block';}
+function goSetup(){document.getElementById('main-screen').style.display='none';document.getElementById('setup-screen').style.display='flex';}
+function updateURL(){const url=document.getElementById('new-url-input').value.trim();if(url){GAS_URL=url;localStorage.setItem('gasUrl',url);}DEMO_MODE=false;refreshAll();}
+
+// JSONP通信（Googleサイト埋め込み対応）
+function fetchGAS(url,params){
+  return new Promise((resolve,reject)=>{
+    const cbName='_gcb'+Math.random().toString(36).slice(2);
+    const qs=Object.entries({...params,callback:cbName}).map(([k,v])=>k+'='+encodeURIComponent(String(v))).join('&');
+    const script=document.createElement('script');
+    let done=false;
+    window[cbName]=function(data){
+      done=true;delete window[cbName];
+      try{document.body.removeChild(script);}catch(e){}
+      resolve(data);
+    };
+    script.onerror=function(){
+      if(done) return;done=true;delete window[cbName];
+      try{document.body.removeChild(script);}catch(e){}
+      reject(new Error('通信エラー'));
+    };
+    setTimeout(()=>{
+      if(done) return;done=true;delete window[cbName];
+      try{document.body.removeChild(script);}catch(e){}
+      reject(new Error('タイムアウト（15秒）'));
+    },15000);
+    script.src=url+'?'+qs;
+    document.body.appendChild(script);
+  });
+}
+
+async function api(params){
+  if(DEMO_MODE) return demoApi(params);
+  // POSTパラメータもGETに変換（JSONP経由）
+  const p={...params};
+  delete p.method;
+  return fetchGAS(GAS_URL,p);
+}
+
+function demoApi(p){
+  if(p.action==='getCustomers') return Promise.resolve([...DEMO_CUSTOMERS]);
+  if(p.action==='getRecords'){
+    let r=[...DEMO_RECORDS];
+    if(p.customer) r=r.filter(x=>x['お客様']===p.customer);
+    return Promise.resolve(r);
+  }
+  if(p.action==='addRecord'){
+    const rec={お客様:p.customer,作業日:p.date,年:p.year||p.date.slice(0,4),作業内容:p.type,作業者:p.worker,時間:Number(p.hours),分:Number(p.min),メモ:p.note||''};
+    DEMO_RECORDS.push(rec);allRecords.push(rec);
+    return Promise.resolve({success:true});
+  }
+  return Promise.resolve({});
+}
+
+function startApp(){
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('main-screen').style.display='block';
+  if(DEMO_MODE) document.getElementById('demo-badge').classList.remove('hidden');
+  document.getElementById('current-url').textContent=DEMO_MODE?'デモモード':GAS_URL;
+  document.getElementById('mode-display').textContent=DEMO_MODE?'デモモードで動作中（データは保存されません）':'Googleスプレッドシートに接続済み';
+  document.getElementById('plan-date').value=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  refreshAll();
+}
+
+async function refreshAll(){
+  customers=await api({action:'getCustomers'});
+  allRecords=await api({action:'getRecords'});
+  planData=DEMO_PLANS;
+  renderList('');
+  if(currentCustomer) renderDetail(currentCustomer);
+}
+
+window.onload=()=>{if(GAS_URL){document.getElementById('gas-url-input').value=GAS_URL;connectGAS();}};
+
+// ============================================================
+// タブ切り替え
+// ============================================================
+function showTab(tab){
+  const tabs=['list','detail','add','stats','plan','config'];
+  tabs.forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden',t!==tab));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',tabs[i]===tab));
+  if(tab==='list') renderList('');
+  if(tab==='detail'&&currentCustomer) renderDetail(currentCustomer);
+  if(tab==='stats') initStats();
+  if(tab==='plan') initPlan();
+}
+
+// ============================================================
+// お客様一覧
+// ============================================================
+function renderList(q){
+  const now=new Date(),yr=String(now.getFullYear());
+  const sites=groupBySite(allRecords);
+  document.getElementById('s-total').textContent=customers.length;
+  document.getElementById('s-month').textContent=getThisMonth().length;
+  document.getElementById('s-done').textContent=sites.filter(s=>s.y===yr).length;
+  document.getElementById('s-rec').textContent=allRecords.length;
+  const filtered=customers.filter(c=>!q||c['お客様名'].includes(q)||c['地区'].includes(q)||(c['tel1']&&c['tel1'].includes(q))||(c['tel2']&&c['tel2'].includes(q)));
+  const monthly=getThisMonth().map(c=>c['お客様名']);
+  document.getElementById('customer-list').innerHTML=filtered.map(c=>{
+    const name=c['お客様名'];
+    const cSites=sites.filter(s=>s.c===name);
+    const last=cSites[0];
+    const hasPlan=monthly.includes(name);
+    const tel=c['tel1']||c['tel2']||'';
+    return `<div class="card card-tap" onclick="openDetail('${name.replace(/'/g,"\\'")}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">${name}</div>
+          <div style="font-size:11px;color:#888;margin-top:2px">${c['住所']||c['地区']||''}</div>
+          ${tel?`<div style="font-size:12px;color:#185FA5;margin-top:4px">📞 ${tel}</div>`:'<div style="font-size:11px;color:#ccc;margin-top:3px">電話番号未登録</div>'}
+          ${c['memo']?`<div style="font-size:11px;color:#aaa;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px">${c['memo']}</div>`:''}
+          ${last?`<div style="font-size:11px;color:#888;margin-top:3px">最終：${last.d}　${last.t}（${last.workers.length}人）</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
+          ${hasPlan?'<span class="badge ba">今月予定</span>':''}
+          <span class="badge bb">${cSites.length}現場</span>
+          ${tel?`<a class="btn btnsm btn-call" href="tel:${tel}" onclick="event.stopPropagation()" style="text-decoration:none">📞 電話</a>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('')||'<div style="text-align:center;padding:2rem;color:#888;font-size:13px">該当するお客様がいません</div>';
+}
+function filterList(q){renderList(q);}
+function openDetail(name){currentCustomer=name;selectedPeriod=null;showTab('detail');}
+
+// ============================================================
+// 作業記録詳細
+// ============================================================
+function renderDetail(name){
+  document.getElementById('detail-name').textContent=name;
+  document.getElementById('contact-panel').classList.add('hidden');
+  const cRec=allRecords.filter(r=>r['お客様']===name);
+  const cSites=groupBySite(cRec);
+  const cData=customers.find(c=>c['お客様名']===name)||{};
+  const typeStats={};
+  WORK_TYPES.forEach(t=>{
+    const ts=cSites.filter(s=>s.t===t);
+    if(!ts.length) return;
+    const stays=ts.map(s=>siteStayMin(s));
+    typeStats[t]={count:ts.length,avg:Math.round(stays.reduce((a,b)=>a+b,0)/stays.length)};
+  });
+  const typeSummary=Object.entries(typeStats).map(([t,v])=>
+    `<span class="badge bc" style="margin:2px">${t}：平均${fmtH(v.avg)}</span>`).join('');
+  document.getElementById('detail-info').innerHTML=`
+    <div style="margin-bottom:10px">
+      <div style="font-size:15px;font-weight:700">${name}</div>
+      <div style="font-size:11px;color:#888;margin-top:2px">${cData['地区']||''}　${cData['住所']||''}</div>
+      ${cData['memo']?`<div style="font-size:11px;color:#888;margin-top:4px;line-height:1.6">${cData['memo']}</div>`:''}
+    </div>
+    <div class="slabel" style="margin-top:0">作業内容ごとの平均滞在時間</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px">${typeSummary||'<span style="font-size:12px;color:#aaa">記録なし</span>'}</div>`;
+  const plan=planData[name]||[];
+  let html='<div class="month-grid">';
+  MNUMS.forEach((mk,i)=>{
+    if(mk==='8a'||mk==='8b') return;
+    const has=cSites.some(s=>getPeriod(s.d)===mk);
+    const sel=selectedPeriod===mk;
+    html+=`<div class="mcell ${has?'done':plan.includes(mk)?'planned':''}${sel?' sel':''}" onclick="selectPeriod(${JSON.stringify(mk)})">${MONTHS[i]}</div>`;
+  });
+  html+='</div><div class="slabel">8月（お盆前後）</div><div class="aug-grid">';
+  ['8a','8b'].forEach(k=>{
+    const has=cSites.some(s=>getPeriod(s.d)===k);
+    const sel=selectedPeriod===k;
+    const lbl=k==='8a'?'8月前半\n（お盆前〜13日）':'8月後半\n（お盆後14日〜）';
+    html+=`<div class="acell ${has?'done':plan.includes(k)?'planned':''}${sel?' sel':''}" onclick="selectPeriod('${k}')">${lbl}</div>`;
+  });
+  html+='</div>';
+  document.getElementById('schedule-grid').innerHTML=html;
+  renderRecords(name,selectedPeriod);
+}
+
+function selectPeriod(p){selectedPeriod=selectedPeriod===p?null:p;renderDetail(currentCustomer);}
+
+function renderRecords(name,period){
+  const cRec=allRecords.filter(r=>r['お客様']===name);
+  let sites=groupBySite(cRec);
+  let label='全作業記録（3年分）';
+  if(period){
+    sites=sites.filter(s=>getPeriod(s.d)===period);
+    if(period==='8a') label='8月前半（お盆前）の記録';
+    else if(period==='8b') label='8月後半（お盆後）の記録';
+    else{const mi=MNUMS.indexOf(Number(period));if(mi>=0)label=MONTHS[mi]+'の記録';}
+  }
+  document.getElementById('detail-records').innerHTML=
+    `<div style="font-size:11px;color:#888;margin-bottom:10px;font-weight:600">${label}（${sites.length}現場）</div>`+
+    (sites.length===0?'<div style="font-size:12px;color:#aaa;text-align:center;padding:1rem">記録がありません</div>':
+    sites.map(s=>{
+      const stay=siteStayMin(s);
+      const chips=s.workers.map(w=>`<span class="worker-chip">${w.who}　${fmtH(w.min)}</span>`).join('');
+      return `<div class="site-group">
+        <div class="site-head">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="badge bg">${s.t}</span>
+              <span style="font-size:12px;font-weight:600">${s.d}</span>
+              <span style="font-size:11px;color:#888">${s.workers.length}人　滞在${fmtH(stay)}</span>
+            </div>
+            ${s.note?`<span style="font-size:11px;color:#999">${s.note}</span>`:''}
+          </div>
+        </div>
+        <div style="padding:8px 12px;display:flex;flex-wrap:wrap">${chips}</div>
+      </div>`;
+    }).join(''));
+}
+
+// ============================================================
+// 連絡機能
+// ============================================================
+function openContact(){
+  const panel=document.getElementById('contact-panel');
+  if(!panel.classList.contains('hidden')){panel.classList.add('hidden');return;}
+  const c=customers.find(x=>x['お客様名']===currentCustomer)||{};
+  const name=currentCustomer.replace(/（.*）/,'').replace(/様.*/,'様');
+  const tel1=c['tel1']||'',tel2=c['tel2']||'';
+  if(!tel1&&!tel2){
+    panel.innerHTML=`<div class="card"><div style="font-size:12px;color:#aaa;padding:4px 0">電話番号が登録されていません。<br>お客様情報を編集して登録してください。</div></div>`;
+    panel.classList.remove('hidden');return;
+  }
+  const tplBtns1=SMS_TEMPLATES.map((t,i)=>`<span class="tpl-chip" onclick="selectTpl(${i},'sp1','${name}','${tel1}')">${t.label}</span>`).join('');
+  const tplBtns2=SMS_TEMPLATES.map((t,i)=>`<span class="tpl-chip" onclick="selectTpl(${i},'sp2','${name}','${tel2}')">${t.label}</span>`).join('');
+  panel.innerHTML=`<div class="card">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px">連絡する</div>
+    <div class="contact-bar">
+      ${tel1?`<a class="contact-btn btn-call" href="tel:${tel1}" style="text-decoration:none">📞 電話①<span style="font-size:11px;font-weight:400">${tel1}</span></a>`:''}
+      ${tel2?`<a class="contact-btn btn-call" href="tel:${tel2}" style="text-decoration:none">📞 電話②<span style="font-size:11px;font-weight:400">${tel2}</span></a>`:''}
+    </div>
+    <div class="contact-bar" style="margin-top:8px">
+      ${tel1?`<button class="contact-btn btn-sms" onclick="toggleSms('sp1')">✉ SMS①<span style="font-size:11px;font-weight:400">${tel1}</span></button>`:''}
+      ${tel2?`<button class="contact-btn btn-sms2" onclick="toggleSms('sp2')">✉ SMS②<span style="font-size:11px;font-weight:400">${tel2}</span></button>`:''}
+    </div>
+    ${tel1?`<div id="sp1" class="sms-panel hidden">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">テンプレートを選択</div>
+      <div style="margin-bottom:8px">${tplBtns1}</div>
+      <textarea id="sp1-text" rows="5" style="margin-bottom:8px" placeholder="メッセージを入力..."></textarea>
+      <div style="display:flex;gap:8px">
+        <a id="sp1-link" class="contact-btn btn-sms" style="flex:none;padding:8px 16px;text-decoration:none" href="#">送信する</a>
+        <button class="btn btnsm" onclick="toggleSms('sp1')">閉じる</button>
+      </div>
+    </div>`:''}
+    ${tel2?`<div id="sp2" class="sms-panel hidden">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">テンプレートを選択（②）</div>
+      <div style="margin-bottom:8px">${tplBtns2}</div>
+      <textarea id="sp2-text" rows="5" style="margin-bottom:8px" placeholder="メッセージを入力..."></textarea>
+      <div style="display:flex;gap:8px">
+        <a id="sp2-link" class="contact-btn btn-sms2" style="flex:none;padding:8px 16px;text-decoration:none" href="#">送信する</a>
+        <button class="btn btnsm" onclick="toggleSms('sp2')">閉じる</button>
+      </div>
+    </div>`:''}
+  </div>`;
+  panel.classList.remove('hidden');
+}
+
+function toggleSms(id){const p=document.getElementById(id);if(p)p.classList.toggle('hidden');}
+
+function selectTpl(idx,panelId,name,tel){
+  const text=SMS_TEMPLATES[idx].text(name);
+  const ta=document.getElementById(panelId+'-text');
+  const link=document.getElementById(panelId+'-link');
+  if(!ta||!link) return;
+  ta.value=text;
+  link.href='sms:'+tel+'?body='+encodeURIComponent(text);
+  ta.oninput=function(){link.href='sms:'+tel+'?body='+encodeURIComponent(this.value);};
+}
+
+// ============================================================
+// 記録追加
+// ============================================================
+function openAdd(){
+  addWorkers=[{name:'',h:3,m:0}];
+  showTab('add');
+  document.getElementById('f-customer').innerHTML=
+    customers.map(c=>`<option ${c['お客様名']===currentCustomer?'selected':''}>${c['お客様名']}</option>`).join('');
+  document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('f-note').value='';
+  document.getElementById('save-status').style.display='none';
+  renderAddWorkers();updateAddPreview();
+}
+
+function renderAddWorkers(){
+  document.getElementById('add-worker-list').innerHTML=addWorkers.map((w,i)=>`
+    <div class="worker-input-row">
+      <input type="text" value="${w.name}" placeholder="作業者名" style="padding:6px 9px;font-size:13px" oninput="addWorkers[${i}].name=this.value"/>
+      <div class="time-sel">
+        <select onchange="addWorkers[${i}].h=parseInt(this.value);updateAddPreview()">
+          ${[0,1,2,3,4,5,6,7,8].map(h=>`<option value="${h}" ${w.h===h?'selected':''}>${h}時間</option>`).join('')}
+        </select>
+        <select onchange="addWorkers[${i}].m=parseInt(this.value);updateAddPreview()">
+          ${[0,10,20,30,40,50].map(m=>`<option value="${m}" ${w.m===m?'selected':''}>${m}分</option>`).join('')}
+        </select>
+      </div>
+      ${addWorkers.length>1?`<button class="btn btnsm" onclick="removeWorkerRow(${i})" style="color:#aaa;border-color:#eee;padding:4px 8px">✕</button>`:'<div style="width:32px"></div>'}
+    </div>`).join('');
+}
+
+function addWorkerRow(){const l=addWorkers[addWorkers.length-1];addWorkers.push({name:'',h:l.h,m:l.m});renderAddWorkers();updateAddPreview();}
+function removeWorkerRow(i){addWorkers.splice(i,1);renderAddWorkers();updateAddPreview();}
+
+function updateAddPreview(){
+  const type=document.getElementById('f-type')?.value;
+  const customer=document.getElementById('f-customer')?.value;
+  const preview=document.getElementById('add-preview');
+  if(!preview) return;
+  const maxMin=Math.max(...addWorkers.map(w=>toMin(w.h,w.m)));
+  if(maxMin>0){
+    const avg=getAvgStay(customer,type);
+    preview.style.display='block';
+    if(avg>0){
+      const diff=maxMin-avg;
+      const diffStr=diff===0?'平均通り':(diff>0?`平均より${fmtH(Math.abs(diff))}長い`:`平均より${fmtH(Math.abs(diff))}短い`);
+      preview.innerHTML=`この現場の滞在目安：<strong>${fmtH(maxMin)}</strong>（${addWorkers.length}人）<br>「${type}」の過去平均：<strong>${fmtH(avg)}</strong>　→　${diffStr}`;
+    } else {
+      preview.innerHTML=`この現場の滞在目安：<strong>${fmtH(maxMin)}</strong>（${addWorkers.length}人）`;
+    }
+  } else {preview.style.display='none';}
+}
+
+async function saveRecord(){
+  const btn=document.getElementById('save-btn');
+  const status=document.getElementById('save-status');
+  btn.disabled=true;status.style.display='block';status.textContent='保存中...';status.style.color='#3B6D11';
+  try{
+    const c=document.getElementById('f-customer').value;
+    const d=document.getElementById('f-date').value;
+    const t=document.getElementById('f-type').value;
+    const note=document.getElementById('f-note').value;
+    const y=d.slice(0,4);
+    if(!d){alert('作業日を入力してください');return;}
+    const valid=addWorkers.filter(w=>toMin(w.h,w.m)>0);
+    if(!valid.length){alert('作業時間を入力してください');return;}
+    for(const w of valid){
+      await api({action:'addRecord',method:'POST',customer:c,date:d,year:y,type:t,hours:w.h,min:w.m,worker:w.name||'未記入',note});
+    }
+    status.textContent='✓ 保存しました！';
+    currentCustomer=c;
+    addWorkers=[{name:'',h:3,m:0}];
+    setTimeout(()=>{showTab('detail');},700);
+  }catch(e){status.textContent='⚠ 保存できませんでした：'+e.message;status.style.color='#A32D2D';}
+  finally{btn.disabled=false;}
+}
+
+// ============================================================
+// 実績分析
+// ============================================================
+function initStats(){
+  document.getElementById('stat-customer').innerHTML=
+    '<option value="">全お客様</option>'+customers.map(c=>`<option>${c['お客様名']}</option>`).join('');
+  renderStats();
+}
+function renderStats(){
+  const fc=document.getElementById('stat-customer').value;
+  const fy=document.getElementById('stat-year').value;
+  let recs=allRecords;
+  if(fc) recs=recs.filter(r=>r['お客様']===fc);
+  if(fy) recs=recs.filter(r=>String(r['年'])===fy);
+  const sites=groupBySite(recs);
+  const byType={};
+  sites.forEach(s=>{
+    const stay=siteStayMin(s);
+    if(!byType[s.t]) byType[s.t]={count:0,total:0};
+    byType[s.t].count++;byType[s.t].total+=stay;
+  });
+  if(!Object.keys(byType).length){document.getElementById('stats-content').innerHTML='<div style="text-align:center;padding:2rem;color:#888;font-size:13px">データがありません</div>';return;}
+  const maxAvg=Math.max(...Object.values(byType).map(v=>Math.round(v.total/v.count)),1);
+  let html=`<div class="card">
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px">作業内容ごとの平均滞在時間</div>
+    <div style="font-size:11px;color:#888;margin-bottom:12px">各現場の最大個人時間を滞在時間として集計</div>
+    <table class="avg-table"><thead><tr><th>作業内容</th><th>現場数</th><th>平均滞在時間</th><th style="width:110px">比較</th></tr></thead><tbody>`;
+  Object.entries(byType).sort((a,b)=>b[1].total/b[1].count-a[1].total/a[1].count).forEach(([type,v])=>{
+    const avg=Math.round(v.total/v.count);
+    html+=`<tr><td>${type}</td><td>${v.count}件</td><td style="font-weight:600">${fmtH(avg)}</td><td><span class="avg-bar" style="width:${Math.round(avg/maxAvg*100)}px"></span></td></tr>`;
+  });
+  html+='</tbody></table></div>';
+  const byC={};
+  customers.forEach(c=>{
+    const name=c['お客様名'];
+    const cs=sites.filter(s=>s.c===name);
+    if(!cs.length) return;
+    const stays=cs.map(s=>siteStayMin(s));
+    byC[name]={count:cs.length,avg:Math.round(stays.reduce((a,b)=>a+b,0)/stays.length)};
+  });
+  html+=`<div class="card">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">お客様別・平均滞在時間</div>
+    <table class="avg-table"><thead><tr><th>お客様</th><th>現場数</th><th>平均滞在時間</th></tr></thead><tbody>`;
+  Object.entries(byC).sort((a,b)=>b[1].avg-a[1].avg).forEach(([name,v])=>{
+    html+=`<tr><td>${name}</td><td>${v.count}件</td><td style="font-weight:600">${fmtH(v.avg)}</td></tr>`;
+  });
+  html+='</tbody></table></div>';
+  document.getElementById('stats-content').innerHTML=html;
+}
+
+// ============================================================
+// 翌日計画
+// ============================================================
+function initPlan(){
+  document.getElementById('plan-date').value=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  if(!visitItems.length) document.getElementById('visit-empty').style.display='block';
+  renderNearList();renderVisitList();
+}
+
+function isAdded(name){return visitItems.some(v=>v.customer===name);}
+
+function addCustomer(name){
+  if(isAdded(name)) return;
+  const type=defaultType();
+  const avg=getAvgStay(name,type);
+  const workers=parseInt(document.getElementById('plan-workers').value)||2;
+  const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
+  visitItems.push({id:Date.now(),customer:name,type,avgMin:avg,
+    overrideH:avg>0?Math.floor(planned/60):2,overrideM:avg>0?planned%60:0,useOverride:avg===0});
+  renderNearList();renderVisitList();
+  document.getElementById('visit-empty').style.display='none';
+}
+function removeVisit(id){
+  visitItems=visitItems.filter(v=>v.id!==id);
+  renderNearList();renderVisitList();
+  if(!visitItems.length) document.getElementById('visit-empty').style.display='block';
+}
+
+function renderNearList(){
+  const monthly=getThisMonth();
+  const workers=parseInt(document.getElementById('plan-workers')?.value)||2;
+  document.getElementById('near-list').innerHTML=
+    monthly.length===0
+      ?'<div style="font-size:12px;color:#aaa;padding:4px 0">今月予定のお客様はいません</div>'
+      :monthly.map(c=>{
+          const name=c['お客様名'];
+          const added=isAdded(name);
+          const type=defaultType();
+          const avg=getAvgStay(name,type);
+          const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
+          const avgStr=avg>0?`${type}：平均${fmtH(avg)} → ${workers}人で${fmtH(planned)}`:'実績データなし';
+          return `<div class="near-chip ${added?'added':''}">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+              <span class="dist-badge">${c['dist']||c['地区']}</span>
+              <div style="min-width:0">
+                <div style="font-size:13px;font-weight:600">${name}</div>
+                <div style="font-size:11px;color:${added?'#3B6D11':'#888'}">${added?'✓ 追加済':avgStr}</div>
+              </div>
+            </div>
+            ${added?'':`<button class="btn btnsm" onclick="addCustomer('${name.replace(/'/g,"\\'")}')">＋ 追加</button>`}
+          </div>`;
+        }).join('');
+}
+
+function searchOther(q){
+  const dd=document.getElementById('other-dropdown');
+  const monthlyNames=getThisMonth().map(c=>c['お客様名']);
+  if(!q){dd.classList.remove('open');return;}
+  const results=customers.filter(c=>c['お客様名'].includes(q));
+  if(!results.length){dd.innerHTML='<div class="cust-option" style="color:#aaa">該当なし</div>';dd.classList.add('open');return;}
+  dd.innerHTML=results.map(c=>{
+    const name=c['お客様名'];
+    const added=isAdded(name);
+    const inMonth=monthlyNames.includes(name);
+    return `<div class="cust-option" style="${added?'color:#aaa;cursor:default':''}"
+      onclick="${added?'':'addCustomer(\''+name.replace(/'/g,"\\'")+'\');document.getElementById(\'other-search\').value=\'\';document.getElementById(\'other-dropdown\').classList.remove(\'open\')'}">
+      ${name}<span style="font-size:11px;color:#888;margin-left:6px">${c['地区']}</span>
+      ${inMonth?'<span style="font-size:11px;color:#3B6D11;margin-left:4px">今月予定</span>':''}
+      ${added?'<span style="font-size:11px;color:#aaa;margin-left:4px">追加済</span>':''}
+    </div>`;
+  }).join('');
+  dd.classList.add('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.cust-search')) document.getElementById('other-dropdown')?.classList.remove('open');
+});
+
+function renderVisitList(){
+  const workers=parseInt(document.getElementById('plan-workers')?.value)||2;
+  const el=document.getElementById('visit-list');
+  if(!visitItems.length){el.innerHTML='';return;}
+  el.innerHTML=visitItems.map((v,i)=>{
+    const typeOpts=WORK_TYPES.map(t=>`<option ${t===v.type?'selected':''}>${t}</option>`).join('');
+    const avg=getAvgStay(v.customer,v.type);
+    const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
+    const hasData=avg>0;
+    const effectiveMin=v.useOverride?(v.overrideH*60+v.overrideM):planned;
+    const infoHtml=hasData
+      ?`実績平均${fmtH(avg)}　→　${workers}人なら <strong>${fmtH(planned)}</strong>`
+      :'<span style="color:#854F0B">実績データなし。目安時間を手入力してください</span>';
+    return `<div class="visit-item">
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
+        <div class="route-num" style="margin-top:3px">${i+1}</div>
+        <div class="visit-selects">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div>
+              <div style="font-size:13px;font-weight:600">${v.customer}</div>
+              <div style="font-size:11px;color:#888">${customers.find(c=>c['お客様名']===v.customer)?.['住所']||''}</div>
+            </div>
+            <button class="btn btnsm" onclick="removeVisit(${v.id})" style="color:#aaa;border-color:#eee;flex-shrink:0">✕</button>
+          </div>
+          <div>
+            <div class="flabel">作業内容</div>
+            <select style="width:100%" onchange="
+              visitItems[${i}].type=this.value;
+              visitItems[${i}].avgMin=getAvgStay(visitItems[${i}].customer,this.value);
+              const pw=parseInt(document.getElementById('plan-workers').value)||2;
+              const pp=visitItems[${i}].avgMin>0?Math.ceil(visitItems[${i}].avgMin/pw/10)*10:0;
+              visitItems[${i}].overrideH=Math.floor(pp/60);
+              visitItems[${i}].overrideM=pp%60;
+              visitItems[${i}].useOverride=visitItems[${i}].avgMin===0;
+              renderVisitList()">${typeOpts}</select>
+          </div>
+          <div>
+            <div class="flabel">目安時間 <span style="font-weight:400;color:#aaa">（実績から自動計算・変更可）</span></div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <input type="number" min="0" max="12" value="${Math.floor(effectiveMin/60)}" style="width:65px;padding:6px 8px"
+                onchange="visitItems[${i}].overrideH=parseInt(this.value)||0;visitItems[${i}].useOverride=true;renderVisitList()"/>
+              <span style="font-size:13px;color:#888;white-space:nowrap">時間</span>
+              <select style="width:80px;padding:6px 8px" onchange="visitItems[${i}].overrideM=parseInt(this.value);visitItems[${i}].useOverride=true;renderVisitList()">
+                ${[0,10,20,30,40,50].map(m=>`<option value="${m}" ${effectiveMin%60===m?'selected':''}>${m}分</option>`).join('')}
+              </select>
+              ${v.useOverride&&hasData?`<button class="btn btnsm" style="font-size:11px;color:#185FA5;border-color:#B5D4F4;white-space:nowrap"
+                onclick="visitItems[${i}].overrideH=Math.floor(${planned}/60);visitItems[${i}].overrideM=${planned}%60;visitItems[${i}].useOverride=false;renderVisitList()">実績に戻す</button>`:''}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info-box ${hasData?'':'warn'}">${infoHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function generatePlan(){
+  const date=document.getElementById('plan-date').value||'（日付未設定）';
+  const startMin=parseInt(document.getElementById('plan-start').value);
+  const base=document.getElementById('plan-base').value;
+  const workers=parseInt(document.getElementById('plan-workers').value);
+  if(!visitItems.length){alert('訪問先を追加してください');return;}
+  const sorted=[...visitItems].sort((a,b)=>{
+    const oa=Number(customers.find(c=>c['お客様名']===a.customer)?.['順'])||9;
+    const ob=Number(customers.find(c=>c['お客様名']===b.customer)?.['順'])||9;
+    return oa-ob;
+  });
+  const TRAVEL=20;
+  const wTags=Array.from({length:workers},(_,i)=>
+    `<span class="worker-tag" style="background:${WCOLORS[i%5]};color:${WTEXTS[i%5]}">作業者${i+1}</span>`).join('');
+  let cursor=startMin;
+  const rows=sorted.map((v,i)=>{
+    const avg=getAvgStay(v.customer,v.type);
+    const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
+    const stayMin=v.useOverride?(v.overrideH*60+v.overrideM):planned;
+    const arrive=fmtClock(cursor),leave=fmtClock(cursor+stayMin);
+    cursor+=stayMin+TRAVEL;
+    const timeNote=v.useOverride?'手動入力':(avg>0?`実績平均${fmtH(avg)}÷${workers}人`:'手動入力');
+    return {v,stayMin,arrive,leave,order:i+1,timeNote};
+  });
+  let html=`<div class="card">
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px">${date}　作業計画案</div>
+    <div style="font-size:11px;color:#888;margin-bottom:12px">出発：${base}　${workers}人　移動目安：${TRAVEL}分/件</div>`;
+  rows.forEach(row=>{
+    const cData=customers.find(c=>c['お客様名']===row.v.customer)||{};
+    const tel=cData['tel1']||cData['tel2']||'';
+    html+=`<div class="sched-card">
+      <div class="sched-head">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="route-num">${row.order}</div>
+          <div>
+            <div style="font-weight:600;font-size:13px">${row.v.customer}</div>
+            <div style="font-size:11px;color:#888">${cData['住所']||''}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="badge bg">${row.v.type}</span>
+          ${tel?`<a class="btn btnsm btn-call" href="tel:${tel}" style="text-decoration:none">📞</a>`:''}
+        </div>
+      </div>
+      <div class="sched-body">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-size:15px;font-weight:700">${row.arrive} 〜 ${row.leave}</div>
+          <div style="font-size:11px;color:#888">滞在${fmtH(row.stayMin)}（${row.timeNote}）</div>
+        </div>
+        <div style="margin-top:7px">${wTags}</div>
+      </div>
+    </div>`;
+  });
+  html+=`<div style="text-align:right;font-size:12px;color:#888;margin-top:8px">予定終了：${fmtClock(cursor-TRAVEL)}頃</div></div>
+  <div style="font-size:11px;color:#aaa;padding-bottom:2rem">
+    ※ ルートは出発地からの距離順による簡易案です。実際の道路状況はGoogleマップでご確認ください。
+  </div>`;
+  document.getElementById('plan-result').innerHTML=html;
+}
+</script>
+</body>
+</html>
