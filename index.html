@@ -275,7 +275,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
           </div>
         </div>
         <div class="frow">
-          <div><div class="flabel">出発地</div><input type="text" id="plan-base" value="泉区長命ヶ丘"/></div>
+          <div><div class="flabel">出発地</div><input type="text" id="plan-base" value="阿賀野市" oninput="renderNearList()" placeholder="例：阿賀野市"/></div>
           <div><div class="flabel">当日の作業人数</div>
             <select id="plan-workers" onchange="renderNearList();renderVisitList()">
               <option value="1">1人</option><option value="2" selected>2人</option>
@@ -464,13 +464,67 @@ function getAvgStay(customer,type){
   return Math.round(stays.reduce((a,b)=>a+b,0)/stays.length);
 }
 
+// 月キーを生成（8月前半=8a、8月後半=8b、それ以外=数字）
+function getMonthKeys(year, month, day){
+  if(month!==8) return [month];
+  return day<=13 ? ['8a'] : ['8b'];
+}
+
+// 過去N ヶ月の未完了お客様を取得（2ヶ月前まで）
+function getIncompleteCustomers(){
+  const now=new Date();
+  const results=[];
+  for(let back=1;back<=2;back++){
+    const d=new Date(now.getFullYear(), now.getMonth()-back, 1);
+    const yr=d.getFullYear();
+    const mo=d.getMonth()+1;
+    // その月の全日数でお盆前後を判定（両方チェック）
+    const keysToCheck = mo===8 ? ['8a','8b'] : [mo];
+    keysToCheck.forEach(mKey=>{
+      customers.forEach(c=>{
+        const name=c['お客様名'];
+        const planMonths=getPlanMonths(name);
+        const planned=planMonths.includes(mKey)||planMonths.includes(Number(mKey));
+        if(isSkipped(name,mKey)) return; // スキップは未完了に含めない
+        if(!planned) return;
+        // その月・その期間に作業記録があるか確認
+        const hasRecord=allRecords.some(r=>{
+          if(r['お客様']!==name) return false;
+          const rd=new Date(r['作業日']);
+          if(rd.getFullYear()!==yr||rd.getMonth()+1!==mo) return false;
+          if(mKey==='8a') return rd.getDate()<=13;
+          if(mKey==='8b') return rd.getDate()>=14;
+          return true;
+        });
+        if(!hasRecord){
+          // 重複チェック
+          const already=results.some(x=>x.customer===name&&x.monthKey===mKey&&x.year===yr);
+          if(!already){
+            const detail=getPlanDetail(name,mKey);
+            const label=mKey==='8a'?mo+'月前半':mKey==='8b'?mo+'月後半':mo+'月';
+            results.push({customer:name,monthKey:mKey,year:yr,label,detail,backMonths:back,cData:c});
+          }
+        }
+      });
+    });
+  }
+  return results;
+}
+
 function getThisMonth(){
   const now=new Date(),tm=now.getMonth()+1;
-  return customers.filter(c=>{
+  const filtered=customers.filter(c=>{
     const months=getPlanMonths(c['お客様名']);
     if(tm===8) return months.includes('8a')||months.includes('8b');
     return months.includes(tm);
-  }).sort((a,b)=>(Number(a['順'])||9)-(Number(b['順'])||9));
+  });
+  // 出発地が入力されていれば距離順、なければ「順」列の番号順
+  const base=document.getElementById('plan-base')?.value||'';
+  const baseCoords=getCoords(base);
+  if(baseCoords){
+    return sortByDistance(filtered);
+  }
+  return filtered.sort((a,b)=>(Number(a['順'])||9)-(Number(b['順'])||9));
 }
 
 function defaultType(){
@@ -591,14 +645,23 @@ function buildPlanData(planResult){
 }
 
 // お客様の予定月リスト（月キーの配列）を返す
+// 作業内容が「スキップ」の月は除外する
 function getPlanMonths(name){
-  return (planData[name]||[]).map(p=>isNaN(p.月)?p.月:Number(p.月));
+  return (planData[name]||[])
+    .filter(p=>(p.作業内容||'').trim()!=='スキップ')
+    .map(p=>isNaN(p.月)?p.月:Number(p.月));
 }
 
 // 特定の月の計画詳細を返す
 function getPlanDetail(name, monthKey){
   const mk=String(monthKey);
   return (planData[name]||[]).find(p=>String(p.月)===mk)||null;
+}
+
+// その月がスキップかどうか
+function isSkipped(name, monthKey){
+  const detail=getPlanDetail(name, monthKey);
+  return detail && (detail.作業内容||'').trim()==='スキップ';
 }
 
 window.onload=()=>{if(GAS_URL){document.getElementById('gas-url-input').value=GAS_URL;connectGAS();}};
@@ -688,31 +751,39 @@ function renderDetail(name){
     if(mk==='8a'||mk==='8b') return;
     const has=cSites.some(s=>getPeriod(s.d)===mk);
     const planned=planMonths.includes(mk)||planMonths.includes(Number(mk));
+    const planned=planMonths.includes(mk)||planMonths.includes(Number(mk));
     const detail=getPlanDetail(name,mk);
+    const skipped=isSkipped(name,mk);
     const sel=selectedPeriod===mk;
-    const overrideMark=detail&&detail.isOverride?'★':'';
-    html+=`<div class="mcell ${has?'done':planned?'planned':''}${sel?' sel':''}" onclick="selectPeriod(${JSON.stringify(mk)})" title="${detail?detail.作業内容+(detail.注意事項?' / '+detail.注意事項:''):''}">${MONTHS[i]}${overrideMark?'<br><span style=\"font-size:9px\">'+overrideMark+'</span>':''}</div>`;
-  });
+    const overrideMark=detail&&detail.isOverride?(skipped?'✕':'★'):'';
+    const skipStyle=skipped?'opacity:0.45;text-decoration:line-through;':'';
+    html+=`<div class="mcell ${has?'done':planned&&!skipped?'planned':''}${sel?' sel':''}" style="${skipStyle}" onclick="selectPeriod(${JSON.stringify(mk)})" title="${skipped?'今年度スキップ':detail?detail.作業内容+(detail.注意事項?' / '+detail.注意事項:''):''}">${MONTHS[i]}${overrideMark?'<br><span style=\"font-size:9px\">'+overrideMark+'</span>':''}</div>`;
   html+='</div><div class="slabel">8月（お盆前後）</div><div class="aug-grid">';
   ['8a','8b'].forEach(k=>{
     const has=cSites.some(s=>getPeriod(s.d)===k);
     const planned=planMonths.includes(k);
     const detail=getPlanDetail(name,k);
+    const skippedA=isSkipped(name,k);
     const sel=selectedPeriod===k;
     const lbl=k==='8a'?'8月前半\n（お盆前〜13日）':'8月後半\n（お盆後14日〜）';
-    const overrideMark=detail&&detail.isOverride?'★':'';
-    html+=`<div class="acell ${has?'done':planned?'planned':''}${sel?' sel':''}" onclick="selectPeriod('${k}')">${lbl}${overrideMark?'\n'+overrideMark:''}</div>`;
-  });
-  html+='</div>';
+    const overrideMark=detail&&detail.isOverride?(skippedA?'✕':'★'):'';
+    const skipStyleA=skippedA?'opacity:0.45;text-decoration:line-through;':'';
+    html+=`<div class="acell ${has?'done':planned&&!skippedA?'planned':''}${sel?' sel':''}" style="${skipStyleA}" onclick="selectPeriod('${k}')">${lbl}${overrideMark?'\n'+overrideMark:''}</div>`;
   // 選択中の月の計画詳細を表示
   if(selectedPeriod!==null){
     const det=getPlanDetail(name,selectedPeriod);
     if(det){
-      html+=`<div style="background:${det.isOverride?'#FAEEDA':'#EAF3DE'};border-radius:10px;padding:10px 14px;margin-top:4px;font-size:12px">
-        <div style="font-weight:600;color:${det.isOverride?'#854F0B':'#3B6D11'};margin-bottom:4px">
-          ${det.isOverride?'★ '+currentYear+'年度の計画（変更あり）':'📋 基本計画'}
-        </div>
-        <div>作業内容：<strong>${det.作業内容||'—'}</strong></div>
+      const skipped=(det.作業内容||'').trim()==='スキップ';
+      const bg=skipped?'#F1EFE8':det.isOverride?'#FAEEDA':'#EAF3DE';
+      const titleColor=skipped?'#5F5E5A':det.isOverride?'#854F0B':'#3B6D11';
+      const titleText=skipped
+        ?'✕ 今年度はスキップ'
+        :det.isOverride?'★ '+currentYear+'年度の計画（変更あり）':'📋 基本計画';
+      html+=`<div style="background:${bg};border-radius:10px;padding:10px 14px;margin-top:4px;font-size:12px">
+        <div style="font-weight:600;color:${titleColor};margin-bottom:4px">${titleText}</div>
+        ${skipped
+          ?'<div style="color:#888">この月は今年度の作業予定がありません</div>'
+          :'<div>作業内容：<strong>'+det.作業内容+'</strong></div>'}
         ${det.注意事項?'<div style="margin-top:4px;color:#854F0B">⚠ 注意：'+det.注意事項+'</div>':''}
       </div>`;
     }
@@ -984,6 +1055,84 @@ function renderStats(){
 // ============================================================
 // 翌日計画
 // ============================================================
+// ============================================================
+// 簡易距離計算（住所テキストから近い順に並べる）
+// ============================================================
+// 新潟県の主要地区に座標（緯度・経度）を割り当て
+const AREA_COORDS={
+  // 会社所在地
+  '阿賀野市':     {lat:37.83, lng:139.23},
+  // 新潟市各区
+  '新潟市':       {lat:37.90, lng:139.02},
+  '中央区':       {lat:37.92, lng:139.04},
+  '北区':         {lat:37.98, lng:139.12},
+  '東区':         {lat:37.92, lng:139.10},
+  '江南区':       {lat:37.86, lng:139.08},
+  '秋葉区':       {lat:37.79, lng:139.10},
+  '西区':         {lat:37.91, lng:138.95},
+  '南区':         {lat:37.77, lng:138.99},
+  '西蒲区':       {lat:37.73, lng:138.87},
+  // 近郊市
+  '新発田市':     {lat:37.95, lng:139.33},
+  '胎内市':       {lat:38.06, lng:139.41},
+  '燕市':         {lat:37.67, lng:138.88},
+  '三条市':       {lat:37.64, lng:138.96},
+  '加茂市':       {lat:37.66, lng:139.05},
+  '五泉市':       {lat:37.74, lng:139.18},
+  // 郡
+  '北蒲原郡':     {lat:37.97, lng:139.27},
+  '聖籠町':       {lat:37.97, lng:139.27},
+  '西蒲原郡':     {lat:37.68, lng:138.82},
+  '弥彦村':       {lat:37.68, lng:138.82},
+  '南蒲原郡':     {lat:37.59, lng:139.01},
+  '田上町':       {lat:37.59, lng:139.01},
+};
+
+// テキストから座標を推定
+function getCoords(address){
+  if(!address) return null;
+  // 細かい地名を先に探す（長い名前が優先）
+  const keys=Object.keys(AREA_COORDS).sort((a,b)=>b.length-a.length);
+  for(const k of keys){
+    if(address.includes(k)) return AREA_COORDS[k];
+  }
+  return null;
+}
+
+// 2点間の距離を計算（km）
+function calcDist(c1, c2){
+  if(!c1||!c2) return 999;
+  const R=6371;
+  const dLat=(c2.lat-c1.lat)*Math.PI/180;
+  const dLng=(c2.lng-c1.lng)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(c1.lat*Math.PI/180)*Math.cos(c2.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// 出発地から各お客様を近い順に並べる
+function sortByDistance(customerList){
+  const base=document.getElementById('plan-base')?.value||'';
+  const baseCoords=getCoords(base);
+  if(!baseCoords) return customerList; // 座標不明なら元の順
+  return [...customerList].sort((a,b)=>{
+    const addrA=a['住所']||a['地区']||'';
+    const addrB=b['住所']||b['地区']||'';
+    const dA=calcDist(baseCoords,getCoords(addrA));
+    const dB=calcDist(baseCoords,getCoords(addrB));
+    return dA-dB;
+  });
+}
+
+// 距離をテキストで返す
+function getDistText(address){
+  const base=document.getElementById('plan-base')?.value||'';
+  const baseCoords=getCoords(base);
+  const coords=getCoords(address);
+  if(!baseCoords||!coords) return '';
+  const d=calcDist(baseCoords,coords);
+  return '約'+Math.round(d)+'km';
+}
+
 function initPlan(){
   document.getElementById('plan-date').value=new Date(Date.now()+86400000).toISOString().slice(0,10);
   if(!visitItems.length) document.getElementById('visit-empty').style.display='block';
@@ -1011,28 +1160,70 @@ function removeVisit(id){
 
 function renderNearList(){
   const monthly=getThisMonth();
+  const incomplete=getIncompleteCustomers();
   const workers=parseInt(document.getElementById('plan-workers')?.value)||2;
-  document.getElementById('near-list').innerHTML=
-    monthly.length===0
-      ?'<div style="font-size:12px;color:#aaa;padding:4px 0">今月予定のお客様はいません</div>'
-      :monthly.map(c=>{
-          const name=c['お客様名'];
-          const added=isAdded(name);
-          const type=defaultType();
-          const avg=getAvgStay(name,type);
-          const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
-          const avgStr=avg>0?`${type}：平均${fmtH(avg)} → ${workers}人で${fmtH(planned)}`:'実績データなし';
-          return `<div class="near-chip ${added?'added':''}">
-            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-              <span class="dist-badge">${c['dist']||c['地区']}</span>
-              <div style="min-width:0">
-                <div style="font-size:13px;font-weight:600">${name}</div>
-                <div style="font-size:11px;color:${added?'#3B6D11':'#888'}">${added?'✓ 追加済':avgStr}</div>
-              </div>
-            </div>
-            ${added?'':`<button class="btn btnsm" onclick="addCustomer('${name.replace(/'/g,"\\'")}')">＋ 追加</button>`}
-          </div>`;
-        }).join('');
+  let html='';
+
+  // 未完了を先に表示（オレンジ）
+  if(incomplete.length>0){
+    html+='<div style="font-size:11px;color:#854F0B;font-weight:600;margin-bottom:6px">⚠ 前月以前に未完了の作業があります</div>';
+    html+=incomplete.map(item=>{
+      const name=item.customer;
+      const added=isAdded(name);
+      const c=item.cData;
+      const type=item.detail?.作業内容||defaultType();
+      const avg=getAvgStay(name,type);
+      const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
+      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(planned):'実績データなし';
+      const note=item.detail?.注意事項?'⚠ '+item.detail.注意事項:'';
+      return '<div class="near-chip '+(added?'added':'')+'" style="border-color:#FAC775;background:'+(added?'#EAF3DE':'#FAEEDA')+'">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">'+
+          '<span class="dist-badge" style="background:#FAC775;color:#854F0B">'+(getDistText(c['住所']||c['地区'])||c['dist']||c['地区'])+'</span>'+
+          '<div style="min-width:0">'+
+            '<div style="font-size:11px;color:#854F0B;font-weight:600">【'+item.label+'未完了】</div>'+
+            '<div style="font-size:13px;font-weight:600">'+name+'</div>'+
+            '<div style="font-size:11px;color:'+(added?'#3B6D11':'#854F0B')+'">'+(added?'✓ 追加済':avgStr)+'</div>'+
+            (note&&!added?'<div style="font-size:11px;color:#854F0B">'+note+'</div>':'')+
+          '</div>'+
+        '</div>'+
+        (added?'':'<button class="btn btnsm" onclick="addCustomer(''+name.replace(/'/g,"\'")+'')">＋ 追加</button>')+
+      '</div>';
+    }).join('');
+    html+='<div style="height:8px"></div>';
+  }
+
+  // 今月予定
+  if(monthly.length===0&&incomplete.length===0){
+    html='<div style="font-size:12px;color:#aaa;padding:4px 0">今月予定のお客様はいません</div>';
+  } else if(monthly.length>0){
+    if(incomplete.length>0){
+      html+='<div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px">今月の予定</div>';
+    }
+    html+=monthly.map(c=>{
+      const name=c['お客様名'];
+      const added=isAdded(name);
+      const type=defaultType();
+      const avg=getAvgStay(name,type);
+      const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
+      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(planned):'実績データなし';
+      const now=new Date();
+      const mKey=now.getMonth()===7?(now.getDate()<=13?'8a':'8b'):now.getMonth()+1;
+      const planDetail=getPlanDetail(name,mKey);
+      const planNote=planDetail?.注意事項?'⚠ '+planDetail.注意事項:'';
+      return '<div class="near-chip '+(added?'added':'')+'">'  +
+        '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">'+
+          '<span class="dist-badge">'+(getDistText(c['住所']||c['地区'])||c['dist']||c['地区'])+'</span>'+
+          '<div style="min-width:0">'+
+            '<div style="font-size:13px;font-weight:600">'+name+'</div>'+
+            '<div style="font-size:11px;color:'+(added?'#3B6D11':'#888')+'">'+(added?'✓ 追加済':avgStr)+'</div>'+
+            (planNote&&!added?'<div style="font-size:11px;color:#854F0B">'+planNote+'</div>':'')+
+          '</div>'+
+        '</div>'+
+        (added?'':'<button class="btn btnsm" onclick="addCustomer(''+name.replace(/'/g,"\'")+'')">＋ 追加</button>')+
+      '</div>';
+    }).join('');
+  }
+  document.getElementById('near-list').innerHTML=html;
 }
 
 function searchOther(q){
@@ -1117,14 +1308,13 @@ function renderVisitList(){
 function generatePlan(){
   const date=document.getElementById('plan-date').value||'（日付未設定）';
   const startMin=parseInt(document.getElementById('plan-start').value);
-  const base=document.getElementById('plan-base').value;
+  const base=document.getElementById('plan-base')?.value||'阿賀野市';
   const workers=parseInt(document.getElementById('plan-workers').value);
   if(!visitItems.length){alert('訪問先を追加してください');return;}
-  const sorted=[...visitItems].sort((a,b)=>{
-    const oa=Number(customers.find(c=>c['お客様名']===a.customer)?.['順'])||9;
-    const ob=Number(customers.find(c=>c['お客様名']===b.customer)?.['順'])||9;
-    return oa-ob;
-  });
+  // 出発地から近い順にソート
+  const visitCustomers=visitItems.map(v=>customers.find(c=>c['お客様名']===v.customer)).filter(Boolean);
+  const sortedCustomers=sortByDistance(visitCustomers);
+  const sorted=sortedCustomers.map(c=>visitItems.find(v=>v.customer===c['お客様名'])).filter(Boolean);
   const TRAVEL=20;
   const wTags=Array.from({length:workers},(_,i)=>
     `<span class="worker-tag" style="background:${WCOLORS[i%5]};color:${WTEXTS[i%5]}">作業者${i+1}</span>`).join('');
@@ -1150,7 +1340,7 @@ function generatePlan(){
           <div class="route-num">${row.order}</div>
           <div>
             <div style="font-weight:600;font-size:13px">${row.v.customer}</div>
-            <div style="font-size:11px;color:#888">${cData['住所']||''}</div>
+            <div style="font-size:11px;color:#888">${cData['住所']||''}　${getDistText(cData['住所']||'')}</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
