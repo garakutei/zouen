@@ -625,13 +625,26 @@ function startApp(){
 }
 
 async function refreshAll(){
-  try{ customers=await fetchGAS(GAS_URL,{action:'getCustomers'}); }catch(e){ customers=[]; }
+  console.log('refreshAll start, GAS_URL=', GAS_URL);
+  try{
+    customers=await fetchGAS(GAS_URL,{action:'getCustomers'});
+    console.log('customers loaded:', customers?.length);
+  }catch(e){ console.error('customers error:',e); customers=[]; }
   if(!Array.isArray(customers)) customers=[];
-  try{ allRecords=await fetchGAS(GAS_URL,{action:'getRecords'}); }catch(e){ allRecords=[]; }
+
+  try{
+    allRecords=await fetchGAS(GAS_URL,{action:'getRecords'});
+    console.log('records loaded:', allRecords?.length);
+  }catch(e){ console.error('records error:',e); allRecords=[]; }
   if(!Array.isArray(allRecords)) allRecords=[];
-  // 年間計画を読み込む（基本＋年度別マージ済み）
-  const planResult=await api({action:'getPlans',year:currentYear});
-  buildPlanData(planResult);
+
+  try{
+    const planResult=await fetchGAS(GAS_URL,{action:'getPlans',year:currentYear});
+    console.log('plans loaded:', planResult);
+    buildPlanData(planResult);
+  }catch(e){ console.error('plans error:',e); planData={}; }
+
+  console.log('rendering list...');
   renderList('');
   if(currentCustomer) renderDetail(currentCustomer);
 }
@@ -760,7 +773,6 @@ function renderDetail(name){
   MNUMS.forEach((mk,i)=>{
     if(mk==='8a'||mk==='8b') return;
     const has=cSites.some(s=>getPeriod(s.d)===mk);
-    const planned=planMonths.includes(mk)||planMonths.includes(Number(mk));
     const planned=planMonths.includes(mk)||planMonths.includes(Number(mk));
     const detail=getPlanDetail(name,mk);
     const skipped=isSkipped(name,mk);
