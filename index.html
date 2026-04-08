@@ -541,37 +541,11 @@ function defaultType(){
 async function connectGAS(){
   const url=document.getElementById('gas-url-input').value.trim();
   if(!url||!url.includes('script.google.com')){showConnectError('正しいURLを入力してください');return;}
-  const btn=document.querySelector('#setup-screen .btnp');
-  if(btn){btn.textContent='接続中...';btn.disabled=true;}
-  showConnectError('');
-
-  // まずfetchで試みる
-  try{
-    const res=await Promise.race([
-      fetch(url+'?action=getCustomers'),
-      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
-    ]);
-    if(res.ok){
-      const data=await res.json();
-      if(Array.isArray(data)||!data.error){
-        GAS_URL=url;localStorage.setItem('gasUrl',url);DEMO_MODE=false;
-        if(btn){btn.textContent='接続する';btn.disabled=false;}
-        startApp();return;
-      }
-    }
-  }catch(e){}
-
-  // fetchが失敗したらJSONPで試みる
   try{
     const data=await fetchGAS(url,{action:'getCustomers'});
     if(!data||data.error) throw new Error(data?.error||'接続失敗');
-    GAS_URL=url;localStorage.setItem('gasUrl',url);DEMO_MODE=false;
-    if(btn){btn.textContent='接続する';btn.disabled=false;}
-    startApp();
-  }catch(e){
-    if(btn){btn.textContent='接続する';btn.disabled=false;}
-    showConnectError('接続できませんでした：'+e.message+'\n\nGASのURLとアクセス権限（全員）を確認してください。');
-  }
+    GAS_URL=url;localStorage.setItem('gasUrl',url);DEMO_MODE=false;startApp();
+  }catch(e){showConnectError('接続できませんでした：'+e.message);}
 }
 function useDemoMode(){DEMO_MODE=true;GAS_URL='';startApp();}
 function showConnectError(msg){const el=document.getElementById('connect-error');el.textContent=msg;el.style.display='block';}
@@ -609,19 +583,6 @@ async function api(params){
   if(DEMO_MODE) return demoApi(params);
   const p={...params};
   delete p.method;
-  // まずfetchを試みる（GitHub Pagesから直接GASへ）
-  try{
-    const qs=Object.entries(p).map(([k,v])=>k+'='+encodeURIComponent(String(v))).join('&');
-    const res=await Promise.race([
-      fetch(GAS_URL+'?'+qs),
-      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
-    ]);
-    if(res.ok){
-      const data=await res.json();
-      return data;
-    }
-  }catch(e){}
-  // fetchが失敗したらJSONPにフォールバック
   return fetchGAS(GAS_URL,p);
 }
 
@@ -664,9 +625,9 @@ function startApp(){
 }
 
 async function refreshAll(){
-  customers=await api({action:'getCustomers'});
+  try{ customers=await fetchGAS(GAS_URL,{action:'getCustomers'}); }catch(e){ customers=[]; }
   if(!Array.isArray(customers)) customers=[];
-  allRecords=await api({action:'getRecords'});
+  try{ allRecords=await fetchGAS(GAS_URL,{action:'getRecords'}); }catch(e){ allRecords=[]; }
   if(!Array.isArray(allRecords)) allRecords=[];
   // 年間計画を読み込む（基本＋年度別マージ済み）
   const planResult=await api({action:'getPlans',year:currentYear});
