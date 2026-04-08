@@ -905,38 +905,79 @@ function renderStats(){
   if(fc) recs=recs.filter(r=>r['お客様']===fc);
   if(fy) recs=recs.filter(r=>String(r['年'])===fy);
   const sites=groupBySite(recs);
+  if(!sites.length){
+    document.getElementById('stats-content').innerHTML='<div style="text-align:center;padding:2rem;color:#888;font-size:13px">データがありません</div>';
+    return;
+  }
+  // 作業内容ごと集計（滞在時間・人数・合計時間）
   const byType={};
   sites.forEach(s=>{
     const stay=siteStayMin(s);
-    if(!byType[s.t]) byType[s.t]={count:0,total:0};
-    byType[s.t].count++;byType[s.t].total+=stay;
+    const workers=s.workers.length;
+    const totalWork=s.workers.reduce((sum,w)=>sum+w.min,0);
+    if(!byType[s.t]) byType[s.t]={count:0,totalStay:0,totalWorkers:0,totalWork:0};
+    byType[s.t].count++;
+    byType[s.t].totalStay+=stay;
+    byType[s.t].totalWorkers+=workers;
+    byType[s.t].totalWork+=totalWork;
   });
-  if(!Object.keys(byType).length){document.getElementById('stats-content').innerHTML='<div style="text-align:center;padding:2rem;color:#888;font-size:13px">データがありません</div>';return;}
-  const maxAvg=Math.max(...Object.values(byType).map(v=>Math.round(v.total/v.count)),1);
+  const maxAvg=Math.max(...Object.values(byType).map(v=>Math.round(v.totalStay/v.count)),1);
   let html=`<div class="card">
-    <div style="font-size:13px;font-weight:600;margin-bottom:4px">作業内容ごとの平均滞在時間</div>
-    <div style="font-size:11px;color:#888;margin-bottom:12px">各現場の最大個人時間を滞在時間として集計</div>
-    <table class="avg-table"><thead><tr><th>作業内容</th><th>現場数</th><th>平均滞在時間</th><th style="width:110px">比較</th></tr></thead><tbody>`;
-  Object.entries(byType).sort((a,b)=>b[1].total/b[1].count-a[1].total/a[1].count).forEach(([type,v])=>{
-    const avg=Math.round(v.total/v.count);
-    html+=`<tr><td>${type}</td><td>${v.count}件</td><td style="font-weight:600">${fmtH(avg)}</td><td><span class="avg-bar" style="width:${Math.round(avg/maxAvg*100)}px"></span></td></tr>`;
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px">作業内容ごとの実績</div>
+    <div style="font-size:11px;color:#888;margin-bottom:12px">滞在時間＝作業者の最大個人時間　合計時間＝全作業者の時間合計</div>
+    <table class="avg-table">
+      <thead><tr>
+        <th>作業内容</th><th>現場数</th><th>平均滞在時間</th><th>平均人数</th><th>平均合計時間</th><th style="width:70px">比較</th>
+      </tr></thead><tbody>`;
+  Object.entries(byType).sort((a,b)=>b[1].totalStay/b[1].count-a[1].totalStay/a[1].count).forEach(([type,v])=>{
+    const avgStay=Math.round(v.totalStay/v.count);
+    const avgWorkers=(v.totalWorkers/v.count).toFixed(1);
+    const avgTotal=Math.round(v.totalWork/v.count);
+    html+=`<tr>
+      <td>${type}</td><td>${v.count}件</td>
+      <td style="font-weight:600">${fmtH(avgStay)}</td>
+      <td>${avgWorkers}人</td>
+      <td style="color:#185FA5;font-weight:600">${fmtH(avgTotal)}</td>
+      <td><span class="avg-bar" style="width:${Math.round(avgStay/maxAvg*70)}px"></span></td>
+    </tr>`;
   });
   html+='</tbody></table></div>';
+  // お客様別集計
   const byC={};
   customers.forEach(c=>{
     const name=c['お客様名'];
     const cs=sites.filter(s=>s.c===name);
     if(!cs.length) return;
     const stays=cs.map(s=>siteStayMin(s));
-    byC[name]={count:cs.length,avg:Math.round(stays.reduce((a,b)=>a+b,0)/stays.length)};
+    const wCounts=cs.map(s=>s.workers.length);
+    const totals=cs.map(s=>s.workers.reduce((sum,w)=>sum+w.min,0));
+    byC[name]={
+      count:cs.length,
+      avgStay:Math.round(stays.reduce((a,b)=>a+b,0)/cs.length),
+      avgWorkers:(wCounts.reduce((a,b)=>a+b,0)/cs.length).toFixed(1),
+      avgTotal:Math.round(totals.reduce((a,b)=>a+b,0)/cs.length),
+    };
   });
   html+=`<div class="card">
-    <div style="font-size:13px;font-weight:600;margin-bottom:12px">お客様別・平均滞在時間</div>
-    <table class="avg-table"><thead><tr><th>お客様</th><th>現場数</th><th>平均滞在時間</th></tr></thead><tbody>`;
-  Object.entries(byC).sort((a,b)=>b[1].avg-a[1].avg).forEach(([name,v])=>{
-    html+=`<tr><td>${name}</td><td>${v.count}件</td><td style="font-weight:600">${fmtH(v.avg)}</td></tr>`;
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">お客様別・平均実績</div>
+    <table class="avg-table">
+      <thead><tr>
+        <th>お客様</th><th>現場数</th><th>平均滞在時間</th><th>平均人数</th><th>平均合計時間</th>
+      </tr></thead><tbody>`;
+  Object.entries(byC).sort((a,b)=>b[1].avgStay-a[1].avgStay).forEach(([name,v])=>{
+    html+=`<tr>
+      <td>${name}</td><td>${v.count}件</td>
+      <td style="font-weight:600">${fmtH(v.avgStay)}</td>
+      <td>${v.avgWorkers}人</td>
+      <td style="color:#185FA5;font-weight:600">${fmtH(v.avgTotal)}</td>
+    </tr>`;
   });
   html+='</tbody></table></div>';
+  html+=`<div style="font-size:11px;color:#aaa;padding:4px 0 1rem;line-height:1.8">
+    ※ <strong>平均滞在時間</strong>：現場にいた時間の目安<br>
+    ※ <strong>平均人数</strong>：その作業に行った作業者の人数<br>
+    ※ <strong>平均合計時間</strong>：全作業者の時間合計（人件費の目安）
+  </div>`;
   document.getElementById('stats-content').innerHTML=html;
 }
 
