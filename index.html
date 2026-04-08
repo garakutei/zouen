@@ -658,6 +658,8 @@ function startApp(){
   document.getElementById('current-url').textContent=DEMO_MODE?'デモモード':GAS_URL;
   document.getElementById('mode-display').textContent=DEMO_MODE?'デモモードで動作中（データは保存されません）':'Googleスプレッドシートに接続済み';
   document.getElementById('plan-date').value=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  // ローディング表示
+  document.getElementById('customer-list').innerHTML='<div class="loading"><div class="spinner"></div>データを読み込み中...</div>';
   refreshAll();
 }
 
@@ -704,7 +706,14 @@ function isSkipped(name, monthKey){
   return detail && (detail.作業内容||'').trim()==='スキップ';
 }
 
-window.onload=()=>{if(GAS_URL){document.getElementById('gas-url-input').value=GAS_URL;connectGAS();}};
+window.onload=()=>{
+  // GASのURLを直接埋め込み（自動接続）
+  const FIXED_URL='https://script.google.com/macros/s/AKfycbxkkGGj84vkfcDZFJxdjdDCbVu6V5M4qyyqS-fbYqV9qD3FrhH143rWbT5RVr_Iw6dm/exec';
+  GAS_URL=FIXED_URL;
+  localStorage.setItem('gasUrl',FIXED_URL);
+  DEMO_MODE=false;
+  startApp();
+};
 
 // ============================================================
 // タブ切り替え
@@ -1406,3 +1415,4 @@ function generatePlan(){
 </script>
 </body>
 </html>
+
