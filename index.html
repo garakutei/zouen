@@ -781,6 +781,7 @@ function renderDetail(name){
     const skipStyle=skipped?'opacity:0.45;text-decoration:line-through;':'';
     html+=`<div class="mcell ${has?'done':planned&&!skipped?'planned':''}${sel?' sel':''}" style="${skipStyle}" onclick="selectPeriod(${JSON.stringify(mk)})" title="${skipped?'今年度スキップ':detail?detail.作業内容+(detail.注意事項?' / '+detail.注意事項:''):''}">${MONTHS[i]}${overrideMark?'<br><span style=\"font-size:9px\">'+overrideMark+'</span>':''}</div>`;
   html+='</div><div class="slabel">8月（お盆前後）</div><div class="aug-grid">';
+  });
   ['8a','8b'].forEach(k=>{
     const has=cSites.some(s=>getPeriod(s.d)===k);
     const planned=planMonths.includes(k);
@@ -791,6 +792,7 @@ function renderDetail(name){
     const overrideMark=detail&&detail.isOverride?(skippedA?'✕':'★'):'';
     const skipStyleA=skippedA?'opacity:0.45;text-decoration:line-through;':'';
     html+=`<div class="acell ${has?'done':planned&&!skippedA?'planned':''}${sel?' sel':''}" style="${skipStyleA}" onclick="selectPeriod('${k}')">${lbl}${overrideMark?'\n'+overrideMark:''}</div>`;
+  });
   // 選択中の月の計画詳細を表示
   if(selectedPeriod!==null){
     const det=getPlanDetail(name,selectedPeriod);
@@ -1162,6 +1164,7 @@ function initPlan(){
 }
 
 function isAdded(name){return visitItems.some(v=>v.customer===name);}
+function addCustomerById(btn){addCustomer(decodeURIComponent(btn.dataset.name));}
 
 function addCustomer(name){
   if(isAdded(name)) return;
@@ -1184,68 +1187,67 @@ function renderNearList(){
   const monthly=getThisMonth();
   const incomplete=getIncompleteCustomers();
   const workers=parseInt(document.getElementById('plan-workers')?.value)||2;
-  let html='';
+  let parts=[];
 
-  // 未完了を先に表示（オレンジ）
   if(incomplete.length>0){
-    html+='<div style="font-size:11px;color:#854F0B;font-weight:600;margin-bottom:6px">⚠ 前月以前に未完了の作業があります</div>';
-    html+=incomplete.map(item=>{
+    parts.push('<div style="font-size:11px;color:#854F0B;font-weight:600;margin-bottom:6px">⚠ 前月以前に未完了の作業があります</div>');
+    incomplete.forEach(function(item){
       const name=item.customer;
       const added=isAdded(name);
-      const c=item.cData;
-      const type=item.detail?.作業内容||defaultType();
+      const c=item.cData||{};
+      const type=item.detail&&item.detail['作業内容']?item.detail['作業内容']:defaultType();
       const avg=getAvgStay(name,type);
-      const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
-      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(planned):'実績データなし';
-      const note=item.detail?.注意事項?'⚠ '+item.detail.注意事項:'';
-      return '<div class="near-chip '+(added?'added':'')+'" style="border-color:#FAC775;background:'+(added?'#EAF3DE':'#FAEEDA')+'">'+
-        '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">'+
-          '<span class="dist-badge" style="background:#FAC775;color:#854F0B">'+(getDistText(c['住所']||c['地区'])||c['dist']||c['地区'])+'</span>'+
-          '<div style="min-width:0">'+
-            '<div style="font-size:11px;color:#854F0B;font-weight:600">【'+item.label+'未完了】</div>'+
-            '<div style="font-size:13px;font-weight:600">'+name+'</div>'+
-            '<div style="font-size:11px;color:'+(added?'#3B6D11':'#854F0B')+'">'+(added?'✓ 追加済':avgStr)+'</div>'+
-            (note&&!added?'<div style="font-size:11px;color:#854F0B">'+note+'</div>':'')+
-          '</div>'+
-        '</div>'+
-        (added?'':'<button class="btn btnsm" onclick="addCustomer(''+name.replace(/'/g,"\'")+'')">＋ 追加</button>')+
-      '</div>';
-    }).join('');
-    html+='<div style="height:8px"></div>';
+      const pl=avg>0?Math.ceil(avg/workers/10)*10:0;
+      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(pl):'実績データなし';
+      const note=item.detail&&item.detail['注意事項']?'⚠ '+item.detail['注意事項']:'';
+      const dist=getDistText(c['住所']||c['地区'])||c['dist']||c['地区']||'';
+      const bg=added?'#EAF3DE':'#FAEEDA';
+      let chip='<div class="near-chip '+(added?'added':'')+'" style="border-color:#FAC775;background:'+bg+'">';
+      chip+='<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">';
+      chip+='<span class="dist-badge" style="background:#FAC775;color:#854F0B">'+dist+'</span>';
+      chip+='<div style="min-width:0">';
+      chip+='<div style="font-size:11px;color:#854F0B;font-weight:600">【'+item.label+'未完了】</div>';
+      chip+='<div style="font-size:13px;font-weight:600">'+name+'</div>';
+      chip+='<div style="font-size:11px;color:'+(added?'#3B6D11':'#854F0B')+'">'+(added?'✓ 追加済':avgStr)+'</div>';
+      if(note&&!added) chip+='<div style="font-size:11px;color:#854F0B">'+note+'</div>';
+      chip+='</div></div>';
+      if(!added) chip+='<button class="btn btnsm" data-name="'+encodeURIComponent(name)+'" onclick="addCustomerById(this)">＋ 追加</button>';
+      chip+='</div>';
+      parts.push(chip);
+    });
+    parts.push('<div style="height:8px"></div>');
   }
 
-  // 今月予定
   if(monthly.length===0&&incomplete.length===0){
-    html='<div style="font-size:12px;color:#aaa;padding:4px 0">今月予定のお客様はいません</div>';
+    parts.push('<div style="font-size:12px;color:#aaa;padding:4px 0">今月予定のお客様はいません</div>');
   } else if(monthly.length>0){
-    if(incomplete.length>0){
-      html+='<div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px">今月の予定</div>';
-    }
-    html+=monthly.map(c=>{
+    if(incomplete.length>0) parts.push('<div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px">今月の予定</div>');
+    monthly.forEach(function(c){
       const name=c['お客様名'];
       const added=isAdded(name);
       const type=defaultType();
       const avg=getAvgStay(name,type);
-      const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
-      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(planned):'実績データなし';
+      const pl=avg>0?Math.ceil(avg/workers/10)*10:0;
+      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(pl):'実績データなし';
       const now=new Date();
       const mKey=now.getMonth()===7?(now.getDate()<=13?'8a':'8b'):now.getMonth()+1;
       const planDetail=getPlanDetail(name,mKey);
-      const planNote=planDetail?.注意事項?'⚠ '+planDetail.注意事項:'';
-      return '<div class="near-chip '+(added?'added':'')+'">'  +
-        '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">'+
-          '<span class="dist-badge">'+(getDistText(c['住所']||c['地区'])||c['dist']||c['地区'])+'</span>'+
-          '<div style="min-width:0">'+
-            '<div style="font-size:13px;font-weight:600">'+name+'</div>'+
-            '<div style="font-size:11px;color:'+(added?'#3B6D11':'#888')+'">'+(added?'✓ 追加済':avgStr)+'</div>'+
-            (planNote&&!added?'<div style="font-size:11px;color:#854F0B">'+planNote+'</div>':'')+
-          '</div>'+
-        '</div>'+
-        (added?'':'<button class="btn btnsm" onclick="addCustomer(''+name.replace(/'/g,"\'")+'')">＋ 追加</button>')+
-      '</div>';
-    }).join('');
+      const planNote=planDetail&&planDetail['注意事項']?'⚠ '+planDetail['注意事項']:'';
+      const dist=getDistText(c['住所']||c['地区'])||c['dist']||c['地区']||'';
+      let chip='<div class="near-chip '+(added?'added':'')+'">';
+      chip+='<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">';
+      chip+='<span class="dist-badge">'+dist+'</span>';
+      chip+='<div style="min-width:0">';
+      chip+='<div style="font-size:13px;font-weight:600">'+name+'</div>';
+      chip+='<div style="font-size:11px;color:'+(added?'#3B6D11':'#888')+'">'+(added?'✓ 追加済':avgStr)+'</div>';
+      if(planNote&&!added) chip+='<div style="font-size:11px;color:#854F0B">'+planNote+'</div>';
+      chip+='</div></div>';
+      if(!added) chip+='<button class="btn btnsm" data-name="'+encodeURIComponent(name)+'" onclick="addCustomerById(this)">＋ 追加</button>';
+      chip+='</div>';
+      parts.push(chip);
+    });
   }
-  document.getElementById('near-list').innerHTML=html;
+  document.getElementById('near-list').innerHTML=parts.join('');
 }
 
 function searchOther(q){
