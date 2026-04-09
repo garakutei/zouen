@@ -266,7 +266,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
       <div class="top-bar"><div class="page-title">翌日作業計画</div></div>
       <div class="plan-box">
         <div class="frow">
-          <div><div class="flabel">作業日</div><input type="date" id="plan-date" oninput="renderNearList();renderVisitList()"/></div>
+          <div><div class="flabel">作業日</div><input type="date" id="plan-date" onchange="renderNearList();renderVisitList()"/></div>
           <div><div class="flabel">開始時刻</div>
             <select id="plan-start">
               <option value="420">7:00</option><option value="450">7:30</option>
