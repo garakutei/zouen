@@ -266,7 +266,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
       <div class="top-bar"><div class="page-title">翌日作業計画</div></div>
       <div class="plan-box">
         <div class="frow">
-          <div><div class="flabel">作業日</div><input type="date" id="plan-date"/></div>
+          <div><div class="flabel">作業日</div><input type="date" id="plan-date" oninput="renderNearList();renderVisitList()"/></div>
           <div><div class="flabel">開始時刻</div>
             <select id="plan-start">
               <option value="420">7:00</option><option value="450">7:30</option>
@@ -524,11 +524,18 @@ function getIncompleteCustomers(){
   return results;
 }
 
-function getThisMonth(){
-  const now=new Date(),tm=now.getMonth()+1;
+function getThisMonth(targetDate){
+  // targetDateがあればその月、なければ今月
+  const d=targetDate||new Date();
+  const tm=d.getMonth()+1;
+  const day=d.getDate();
   const filtered=customers.filter(c=>{
     const months=getPlanMonths(c['お客様名']);
-    if(tm===8) return months.includes('8a')||months.includes('8b');
+    if(tm===8){
+      // 8月は日付でお盆前後を判定
+      if(day<=13) return months.includes('8a');
+      return months.includes('8b');
+    }
     return months.includes(tm);
   });
   // 出発地が入力されていれば距離順、なければ「順」列の番号順
@@ -538,6 +545,12 @@ function getThisMonth(){
     return sortByDistance(filtered);
   }
   return filtered.sort((a,b)=>(Number(a['順'])||9)-(Number(b['順'])||9));
+}
+
+// 翌日計画用：入力日付からターゲット日を取得
+function getPlanTargetDate(){
+  const val=document.getElementById('plan-date')?.value;
+  return val ? new Date(val) : new Date(Date.now()+86400000);
 }
 
 function defaultType(){
@@ -1197,7 +1210,7 @@ function removeVisit(id){
 }
 
 function renderNearList(){
-  const monthly=getThisMonth();
+  const monthly=getThisMonth(getPlanTargetDate());
   const incomplete=getIncompleteCustomers();
   const workers=parseInt(document.getElementById('plan-workers')?.value)||2;
   let parts=[];
