@@ -689,21 +689,30 @@ function buildPlanData(planResult){
 // お客様の予定月リスト（月キーの配列）を返す
 // 作業内容が「スキップ」の月は除外する
 function getPlanMonths(name){
-  return (planData[name]||[])
+  const months=(planData[name]||[])
     .filter(p=>(p.作業内容||'').trim()!=='スキップ')
     .map(p=>isNaN(p.月)?p.月:Number(p.月));
+  // 重複を除く
+  return [...new Set(months.map(m=>String(m)))].map(m=>isNaN(m)?m:Number(m));
 }
 
-// 特定の月の計画詳細を返す
-function getPlanDetail(name, monthKey){
+// 特定の月の計画詳細を全件返す（複数作業対応）
+function getPlanDetails(name, monthKey){
   const mk=String(monthKey);
-  return (planData[name]||[]).find(p=>String(p.月)===mk)||null;
+  return (planData[name]||[]).filter(p=>String(p.月)===mk);
 }
 
-// その月がスキップかどうか
+// 後方互換：最初の1件を返す（スキップ判定などに使用）
+function getPlanDetail(name, monthKey){
+  const results=getPlanDetails(name, monthKey);
+  return results.length>0?results[0]:null;
+}
+
+// その月がスキップかどうか（全件がスキップの場合のみtrue）
 function isSkipped(name, monthKey){
-  const detail=getPlanDetail(name, monthKey);
-  return detail && (detail.作業内容||'').trim()==='スキップ';
+  const details=getPlanDetails(name, monthKey);
+  if(!details.length) return false;
+  return details.every(d=>(d.作業内容||'').trim()==='スキップ');
 }
 
 window.onload=()=>{
@@ -819,23 +828,28 @@ function renderDetail(name){
     const skipStyleA=skippedA?'opacity:0.45;text-decoration:line-through;':'';
     html+=`<div class="acell ${has?'done':planned&&!skippedA?'planned':''}${sel?' sel':''}" style="${skipStyleA}" onclick="selectPeriod('${k}')">${lbl}${overrideMark?'\n'+overrideMark:''}</div>`;
   });
-  // 選択中の月の計画詳細を表示
+  // 選択中の月の計画詳細を表示（複数作業対応）
   if(selectedPeriod!==null){
-    const det=getPlanDetail(name,selectedPeriod);
-    if(det){
-      const skipped=(det.作業内容||'').trim()==='スキップ';
-      const bg=skipped?'#F1EFE8':det.isOverride?'#FAEEDA':'#EAF3DE';
-      const titleColor=skipped?'#5F5E5A':det.isOverride?'#854F0B':'#3B6D11';
-      const titleText=skipped
-        ?'✕ 今年度はスキップ'
-        :det.isOverride?'★ '+currentYear+'年度の計画（変更あり）':'📋 基本計画';
-      html+=`<div style="background:${bg};border-radius:10px;padding:10px 14px;margin-top:4px;font-size:12px">
-        <div style="font-weight:600;color:${titleColor};margin-bottom:4px">${titleText}</div>
-        ${skipped
-          ?'<div style="color:#888">この月は今年度の作業予定がありません</div>'
-          :'<div>作業内容：<strong>'+det.作業内容+'</strong></div>'}
-        ${det.注意事項?'<div style="margin-top:4px;color:#854F0B">⚠ 注意：'+det.注意事項+'</div>':''}
-      </div>`;
+    const dets=getPlanDetails(name,selectedPeriod);
+    if(dets.length>0){
+      const allSkipped=dets.every(d=>(d.作業内容||'').trim()==='スキップ');
+      const hasOverride=dets.some(d=>d.isOverride);
+      const bg=allSkipped?'#F1EFE8':hasOverride?'#FAEEDA':'#EAF3DE';
+      const titleColor=allSkipped?'#5F5E5A':hasOverride?'#854F0B':'#3B6D11';
+      const titleText=allSkipped?'✕ 今年度はスキップ'
+        :hasOverride?'★ '+currentYear+'年度の計画（変更あり）':'📋 基本計画';
+      html+='<div style="background:'+bg+';border-radius:10px;padding:10px 14px;margin-top:4px;font-size:12px">';
+      html+='<div style="font-weight:600;color:'+titleColor+';margin-bottom:6px">'+titleText+'</div>';
+      if(allSkipped){
+        html+='<div style="color:#888">この月は今年度の作業予定がありません</div>';
+      } else {
+        dets.filter(d=>(d.作業内容||'').trim()!=='スキップ').forEach(function(det,i){
+          if(i>0) html+='<div style="border-top:1px solid rgba(0,0,0,0.08);margin:6px 0"></div>';
+          html+='<div>作業内容：<strong>'+det.作業内容+'</strong></div>';
+          if(det.注意事項) html+='<div style="margin-top:3px;color:#854F0B">⚠ 注意：'+det.注意事項+'</div>';
+        });
+      }
+      html+='</div>';
     }
   }
   document.getElementById('schedule-grid').innerHTML=html;
