@@ -791,17 +791,25 @@ function renderDetail(name){
     const ts=cSites.filter(s=>s.t===t);
     if(!ts.length) return;
     const stays=ts.map(s=>siteStayMin(s));
-    typeStats[t]={count:ts.length,avg:Math.round(stays.reduce((a,b)=>a+b,0)/stays.length)};
+    const workerCounts=ts.map(s=>s.workers.length);
+    const totalWorks=ts.map(s=>s.workers.reduce((a,w)=>a+w.min,0));
+    typeStats[t]={
+      count:ts.length,
+      avgStay:Math.round(stays.reduce((a,b)=>a+b,0)/ts.length),
+      avgWorkers:(workerCounts.reduce((a,b)=>a+b,0)/ts.length).toFixed(1),
+      avgTotal:Math.round(totalWorks.reduce((a,b)=>a+b,0)/ts.length),
+    };
   });
   const typeSummary=Object.entries(typeStats).map(([t,v])=>
-    `<span class="badge bc" style="margin:2px">${t}：平均${fmtH(v.avg)}</span>`).join('');
+    '<span class="badge bc" style="margin:2px;line-height:1.7">'+t+'：平均'+fmtH(v.avgStay)+'（'+v.avgWorkers+'人）合計'+fmtH(v.avgTotal)+'</span>'
+  ).join('');
   document.getElementById('detail-info').innerHTML=`
     <div style="margin-bottom:10px">
       <div style="font-size:15px;font-weight:700">${name}</div>
       <div style="font-size:11px;color:#888;margin-top:2px">${cData['地区']||''}　${cData['住所']||''}</div>
       ${cData['memo']?`<div style="font-size:11px;color:#888;margin-top:4px;line-height:1.6">${cData['memo']}</div>`:''}
     </div>
-    <div class="slabel" style="margin-top:0">作業内容ごとの平均滞在時間</div>
+    <div class="slabel" style="margin-top:0">作業内容ごとの実績</div>
     <div style="display:flex;flex-wrap:wrap;gap:4px">${typeSummary||'<span style="font-size:12px;color:#aaa">記録なし</span>'}</div>`;
   const planMonths=getPlanMonths(name);
   // 今年度（4月始まり）の記録だけをスケジュール表示に使う
