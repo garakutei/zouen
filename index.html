@@ -471,13 +471,26 @@ function getMonthKeys(year, month, day){
 }
 
 // 過去N ヶ月の未完了お客様を取得（2ヶ月前まで）
+// 4月始まりの年度を返す（例：2026年4月〜2027年3月 → 2026）
+function getFiscalYear(date){
+  const m=date.getMonth()+1;
+  return m>=4 ? date.getFullYear() : date.getFullYear()-1;
+}
+
 function getIncompleteCustomers(){
   const now=new Date();
+  const currentFY=getFiscalYear(now);
   const results=[];
+
   for(let back=1;back<=2;back++){
     const d=new Date(now.getFullYear(), now.getMonth()-back, 1);
     const yr=d.getFullYear();
     const mo=d.getMonth()+1;
+    const targetFY=getFiscalYear(d);
+
+    // 現在の年度より前の月はチェックしない（前年度の未完了は表示しない）
+    if(targetFY < currentFY) continue;
+
     // その月の全日数でお盆前後を判定（両方チェック）
     const keysToCheck = mo===8 ? ['8a','8b'] : [mo];
     keysToCheck.forEach(mKey=>{
