@@ -804,10 +804,15 @@ function renderDetail(name){
     <div class="slabel" style="margin-top:0">作業内容ごとの平均滞在時間</div>
     <div style="display:flex;flex-wrap:wrap;gap:4px">${typeSummary||'<span style="font-size:12px;color:#aaa">記録なし</span>'}</div>`;
   const planMonths=getPlanMonths(name);
+  // 今年度（4月始まり）の記録だけをスケジュール表示に使う
+  const cSitesFY=cSites.filter(s=>{
+    const d=new Date(s.d);
+    return getFiscalYear(d)===parseInt(currentYear);
+  });
   let html='<div class="month-grid">';
   MNUMS.forEach((mk,i)=>{
     if(mk==='8a'||mk==='8b') return;
-    const has=cSites.some(s=>getPeriod(s.d)===mk);
+    const has=cSitesFY.some(s=>getPeriod(s.d)===mk);
     const planned=planMonths.includes(mk)||planMonths.includes(Number(mk));
     const detail=getPlanDetail(name,mk);
     const skipped=isSkipped(name,mk);
@@ -818,7 +823,7 @@ function renderDetail(name){
   });
   html+='</div><div class="slabel">8月（お盆前後）</div><div class="aug-grid">';
   ['8a','8b'].forEach(k=>{
-    const has=cSites.some(s=>getPeriod(s.d)===k);
+    const has=cSitesFY.some(s=>getPeriod(s.d)===k);
     const planned=planMonths.includes(k);
     const detail=getPlanDetail(name,k);
     const skippedA=isSkipped(name,k);
