@@ -780,8 +780,8 @@ function renderDetail(name){
     const overrideMark=detail&&detail.isOverride?(skipped?'✕':'★'):'';
     const skipStyle=skipped?'opacity:0.45;text-decoration:line-through;':'';
     html+=`<div class="mcell ${has?'done':planned&&!skipped?'planned':''}${sel?' sel':''}" style="${skipStyle}" onclick="selectPeriod(${JSON.stringify(mk)})" title="${skipped?'今年度スキップ':detail?detail.作業内容+(detail.注意事項?' / '+detail.注意事項:''):''}">${MONTHS[i]}${overrideMark?'<br><span style=\"font-size:9px\">'+overrideMark+'</span>':''}</div>`;
-  html+='</div><div class="slabel">8月（お盆前後）</div><div class="aug-grid">';
   });
+  html+='</div><div class="slabel">8月（お盆前後）</div><div class="aug-grid">';
   ['8a','8b'].forEach(k=>{
     const has=cSites.some(s=>getPeriod(s.d)===k);
     const planned=planMonths.includes(k);
