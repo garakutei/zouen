@@ -292,8 +292,14 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
         </div>
         <div class="frow">
           <div><div class="flabel">出発地</div><input type="text" id="plan-base" value="阿賀野市" oninput="renderNearList()" placeholder="例：阿賀野市"/></div>
-          <div style="display:flex;align-items:flex-end">
-            <div id="plan-time-info" style="font-size:12px;color:#3B6D11;padding-bottom:2px"></div>
+          <div><div class="flabel">作業内容で絞り込み</div>
+            <select id="plan-filter-type" onchange="renderNearList()">
+              <option value="">すべて（今月予定）</option>
+              <option>剪定</option>
+              <option>雪囲い</option>
+              <option>雪囲い取除き</option>
+              <option>消毒</option>
+            </select>
           </div>
         </div>
         <div class="slabel" style="margin-top:4px">今月予定のお客様 <span style="font-weight:400;color:#aaa">（出発地に近い順）</span></div>
@@ -1375,55 +1381,109 @@ function removeVisit(id){
 }
 
 function renderNearList(){
-  const monthly=getThisMonth(getPlanTargetDate());
-  const incomplete=getIncompleteCustomers();
+  const targetDate=getPlanTargetDate();
   const workers=parseInt(document.getElementById('plan-workers')?.value)||2;
+  const filterType=document.getElementById('plan-filter-type')?.value||'';
+  const incomplete=getIncompleteCustomers();
   let parts=[];
 
-  if(incomplete.length>0){
-    parts.push('<div style="font-size:11px;color:#854F0B;font-weight:600;margin-bottom:6px">⚠ 前月以前に未完了の作業があります</div>');
-    incomplete.forEach(function(item){
-      const name=item.customer;
-      const added=isAdded(name);
-      const c=item.cData||{};
-      const type=item.detail&&item.detail['作業内容']?item.detail['作業内容']:defaultType();
-      const avg=getAvgStay(name,type);
-      const pl=avg>0?Math.ceil(avg/workers/10)*10:0;
-      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(pl):'実績データなし';
-      const note=item.detail&&item.detail['注意事項']?'⚠ '+item.detail['注意事項']:'';
-      const dist=getDistText(c['住所']||c['地区'])||c['dist']||c['地区']||'';
-      const bg=added?'#EAF3DE':'#FAEEDA';
-      let chip='<div class="near-chip '+(added?'added':'')+'" style="border-color:#FAC775;background:'+bg+'">';
-      chip+='<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">';
-      chip+='<span class="dist-badge" style="background:#FAC775;color:#854F0B">'+dist+'</span>';
-      chip+='<div style="min-width:0">';
-      chip+='<div style="font-size:11px;color:#854F0B;font-weight:600">【'+item.label+'未完了】</div>';
-      chip+='<div style="font-size:13px;font-weight:600">'+name+'</div>';
-      chip+='<div style="font-size:11px;color:'+(added?'#3B6D11':'#854F0B')+'">'+(added?'✓ 追加済':avgStr)+'</div>';
-      if(note&&!added) chip+='<div style="font-size:11px;color:#854F0B">'+note+'</div>';
-      chip+='</div></div>';
-      if(!added) chip+='<button class="btn btnsm" data-name="'+encodeURIComponent(name)+'" onclick="addCustomerById(this)">＋ 追加</button>';
-      chip+='</div>';
-      parts.push(chip);
+  // 今月予定のお客様を取得（作業内容フィルタ対応）
+  function getFilteredMonthly(){
+    const base=getThisMonth(targetDate);
+    if(!filterType) return base;
+    // 選択した作業内容が計画に含まれているお客様だけ返す
+    const td=targetDate||new Date();
+    const mo=td.getMonth()+1;
+    const day=td.getDate();
+    const mKey=mo===8?(day<=13?'8a':'8b'):mo;
+    return base.filter(c=>{
+      const dets=getPlanDetails(c['お客様名'],mKey);
+      return dets.some(d=>d.作業内容===filterType&&(d.作業内容||'').trim()!=='スキップ');
     });
-    parts.push('<div style="height:8px"></div>');
   }
 
-  if(monthly.length===0&&incomplete.length===0){
-    parts.push('<div style="font-size:12px;color:#aaa;padding:4px 0">今月予定のお客様はいません</div>');
-  } else if(monthly.length>0){
-    if(incomplete.length>0) parts.push('<div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px">今月の予定</div>');
-    monthly.forEach(function(c){
+  // 未完了（前月）
+  if(incomplete.length>0){
+    const filteredIncomplete=filterType
+      ? incomplete.filter(item=>item.detail&&item.detail['作業内容']===filterType)
+      : incomplete;
+    if(filteredIncomplete.length>0){
+      parts.push('<div style="font-size:11px;color:#854F0B;font-weight:600;margin-bottom:6px">⚠ 前月以前に未完了の作業があります</div>');
+      filteredIncomplete.forEach(function(item){
+        const name=item.customer;
+        const added=isAdded(name);
+        const c=item.cData||{};
+        const type=item.detail&&item.detail['作業内容']?item.detail['作業内容']:filterType||defaultType();
+        const avg=getAvgStay(name,type);
+        const pl=avg>0?Math.ceil(avg/workers/10)*10:0;
+        const totalWork=avg>0?pl*workers:0;
+        const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(pl)+'　合計'+fmtH(totalWork):'実績データなし';
+        const note=item.detail&&item.detail['注意事項']?'⚠ '+item.detail['注意事項']:'';
+        const dist=getDistText(c['住所']||c['地区'])||c['dist']||c['地区']||'';
+        const bg=added?'#EAF3DE':'#FAEEDA';
+        let chip='<div class="near-chip '+(added?'added':'')+'" style="border-color:#FAC775;background:'+bg+'">';
+        chip+='<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">';
+        chip+='<span class="dist-badge" style="background:#FAC775;color:#854F0B">'+dist+'</span>';
+        chip+='<div style="min-width:0">';
+        chip+='<div style="font-size:11px;color:#854F0B;font-weight:600">【'+item.label+'未完了】</div>';
+        chip+='<div style="font-size:13px;font-weight:600">'+name+'</div>';
+        chip+='<div style="font-size:11px;color:'+(added?'#3B6D11':'#854F0B')+'">'+(added?'✓ 追加済':avgStr)+'</div>';
+        if(note&&!added) chip+='<div style="font-size:11px;color:#854F0B">'+note+'</div>';
+        chip+='</div></div>';
+        if(!added) chip+='<button class="btn btnsm" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'" onclick="addCustomerByIdWithType(this)">＋ 追加</button>';
+        chip+='</div>';
+        parts.push(chip);
+      });
+      parts.push('<div style="height:8px"></div>');
+    }
+  }
+
+  // 今月予定（フィルタ適用）
+  const monthly=getFilteredMonthly();
+
+  // 未完了チェック：その月・その作業がすでに完了しているお客様を除く
+  const td=targetDate||new Date();
+  const mo=td.getMonth()+1;
+  const yr=td.getFullYear();
+  const day2=td.getDate();
+  const mKey=mo===8?(day2<=13?'8a':'8b'):mo;
+
+  // 今月完了済みのお客様を除外
+  const uncompleted=monthly.filter(c=>{
+    const name=c['お客様名'];
+    const dets=getPlanDetails(name,mKey).filter(d=>(d.作業内容||'').trim()!=='スキップ');
+    const targetTypes=filterType?dets.filter(d=>d.作業内容===filterType):dets;
+    if(!targetTypes.length) return false;
+    // 今月その作業の記録があるか確認
+    return targetTypes.some(det=>{
+      const t=det.作業内容;
+      return !allRecords.some(r=>{
+        if(r['お客様']!==name||r['作業内容']!==t) return false;
+        const rd=new Date(r['作業日']);
+        if(rd.getFullYear()!==yr||rd.getMonth()+1!==mo) return false;
+        if(mKey==='8a') return rd.getDate()<=13;
+        if(mKey==='8b') return rd.getDate()>=14;
+        return true;
+      });
+    });
+  });
+
+  if(uncompleted.length===0&&incomplete.length===0){
+    parts.push('<div style="font-size:12px;color:#aaa;padding:4px 0">'+(filterType?filterType+'の未完了の予定はありません':'今月予定のお客様はいません')+'</div>');
+  } else if(uncompleted.length>0){
+    if(incomplete.length>0) parts.push('<div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px">今月の予定（未完了）</div>');
+    uncompleted.forEach(function(c){
       const name=c['お客様名'];
       const added=isAdded(name);
-      const type=defaultType();
+      // その月の計画作業内容を取得
+      const dets=getPlanDetails(name,mKey).filter(d=>(d.作業内容||'').trim()!=='スキップ');
+      const targetDets=filterType?dets.filter(d=>d.作業内容===filterType):dets;
+      const type=targetDets.length>0?targetDets[0].作業内容:filterType||defaultType();
+      const planNote=targetDets.length>0&&targetDets[0]['注意事項']?'⚠ '+targetDets[0]['注意事項']:'';
       const avg=getAvgStay(name,type);
       const pl=avg>0?Math.ceil(avg/workers/10)*10:0;
-      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(pl):'実績データなし';
-      const now=new Date();
-      const mKey=now.getMonth()===7?(now.getDate()<=13?'8a':'8b'):now.getMonth()+1;
-      const planDetail=getPlanDetail(name,mKey);
-      const planNote=planDetail&&planDetail['注意事項']?'⚠ '+planDetail['注意事項']:'';
+      const totalWork=avg>0?pl*workers:0;
+      const avgStr=avg>0?type+'：平均'+fmtH(avg)+' → '+workers+'人で'+fmtH(pl)+'　合計'+fmtH(totalWork):'実績データなし';
       const dist=getDistText(c['住所']||c['地区'])||c['dist']||c['地区']||'';
       let chip='<div class="near-chip '+(added?'added':'')+'">';
       chip+='<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">';
@@ -1433,12 +1493,32 @@ function renderNearList(){
       chip+='<div style="font-size:11px;color:'+(added?'#3B6D11':'#888')+'">'+(added?'✓ 追加済':avgStr)+'</div>';
       if(planNote&&!added) chip+='<div style="font-size:11px;color:#854F0B">'+planNote+'</div>';
       chip+='</div></div>';
-      if(!added) chip+='<button class="btn btnsm" data-name="'+encodeURIComponent(name)+'" onclick="addCustomerById(this)">＋ 追加</button>';
+      if(!added) chip+='<button class="btn btnsm" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'" onclick="addCustomerByIdWithType(this)">＋ 追加</button>';
       chip+='</div>';
       parts.push(chip);
     });
   }
   document.getElementById('near-list').innerHTML=parts.join('');
+}
+
+// 作業内容を指定してお客様を追加
+function addCustomerByIdWithType(btn){
+  const name=decodeURIComponent(btn.dataset.name);
+  const type=decodeURIComponent(btn.dataset.type||'');
+  if(isAdded(name)) return;
+  const workers=parseInt(document.getElementById('plan-workers').value)||2;
+  const avg=getAvgStay(name,type||defaultType());
+  const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
+  visitItems.push({
+    id:Date.now(),customer:name,
+    type:type||defaultType(),
+    avgMin:avg,
+    overrideH:avg>0?Math.floor(planned/60):2,
+    overrideM:avg>0?planned%60:0,
+    useOverride:avg===0
+  });
+  renderNearList();renderVisitList();
+  document.getElementById('visit-empty').style.display='none';
 }
 
 function searchOther(q){
