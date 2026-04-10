@@ -162,7 +162,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
     <div class="header-top">
       <div class="app-logo">🌿 造園管理</div>
       <span id="demo-badge" class="badge bc hidden">デモ</span>
-      <button class="sync-btn" onclick="refreshAll()">↻ 同期</button>
+      <button class="sync-btn" id="sync-btn" onclick="clearCache();refreshAll(true)">↻ 同期</button><span id="sync-status" style="font-size:10px;color:#888;margin-left:4px"></span>
     </div>
     <div class="tabs">
       <button class="tab active" onclick="showTab('list')">お客様一覧</button>
@@ -326,7 +326,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
       </div>
       <div class="card">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px">データ同期</div>
-        <button class="btn" style="width:100%" onclick="refreshAll()">全データを再読み込み</button>
+        <button class="btn" style="width:100%" onclick="clearCache();refreshAll(true)">全データを再読み込み</button>
       </div>
       <div class="card">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px">📊 年間計画表のダウンロード</div>
@@ -694,34 +694,81 @@ function startApp(){
   document.getElementById('current-url').textContent=DEMO_MODE?'デモモード':GAS_URL;
   document.getElementById('mode-display').textContent=DEMO_MODE?'デモモードで動作中（データは保存されません）':'Googleスプレッドシートに接続済み';
   document.getElementById('plan-date').value=new Date(Date.now()+86400000).toISOString().slice(0,10);
-  // ローディング表示
-  document.getElementById('customer-list').innerHTML='<div class="loading"><div class="spinner"></div>データを読み込み中...</div>';
+  // キャッシュがなければローディング表示
+  const hasCached=!DEMO_MODE&&loadCache();
+  if(!hasCached){
+    document.getElementById('customer-list').innerHTML='<div class="loading"><div class="spinner"></div>データを読み込み中...</div>';
+  }
   refreshAll();
 }
 
-async function refreshAll(){
-  console.log('refreshAll start, GAS_URL=', GAS_URL);
-  try{
-    customers=await fetchGAS(GAS_URL,{action:'getCustomers'});
-    console.log('customers loaded:', customers?.length);
-  }catch(e){ console.error('customers error:',e); customers=[]; }
-  if(!Array.isArray(customers)) customers=[];
+// ============================================================
+// キャッシュ機能（sessionStorage）
+// ============================================================
+const CACHE_KEY='zouen_cache';
+const CACHE_TTL=30*60*1000; // 30分
 
+function saveCache(){
   try{
-    allRecords=await fetchGAS(GAS_URL,{action:'getRecords'});
-    console.log('records loaded:', allRecords?.length);
-  }catch(e){ console.error('records error:',e); allRecords=[]; }
-  if(!Array.isArray(allRecords)) allRecords=[];
+    const cache={
+      customers,allRecords,
+      planDataStr:JSON.stringify(planData),
+      currentYear,
+      savedAt:Date.now()
+    };
+    sessionStorage.setItem(CACHE_KEY,JSON.stringify(cache));
+  }catch(e){}
+}
 
+function loadCache(){
   try{
-    const planResult=await fetchGAS(GAS_URL,{action:'getPlans',year:currentYear});
-    console.log('plans loaded:', planResult);
+    const raw=sessionStorage.getItem(CACHE_KEY);
+    if(!raw) return false;
+    const cache=JSON.parse(raw);
+    // TTL確認
+    if(Date.now()-cache.savedAt>CACHE_TTL) return false;
+    customers=cache.customers||[];
+    allRecords=cache.allRecords||[];
+    planData=JSON.parse(cache.planDataStr||'{}');
+    return true;
+  }catch(e){ return false; }
+}
+
+function clearCache(){
+  try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+}
+
+async function refreshAll(forceReload){
+  // キャッシュがあれば即座に表示してからバックグラウンドで更新
+  const hasCacheData=!forceReload&&loadCache();
+  if(hasCacheData){
+    renderList('');
+    if(currentCustomer) renderDetail(currentCustomer);
+    // バックグラウンドでデータ更新
+    document.getElementById('sync-status')&&(document.getElementById('sync-status').textContent='🔄 更新中...');
+  }
+
+  // GASからデータ取得
+  try{
+    const [newCustomers,newRecords,planResult]=await Promise.all([
+      fetchGAS(GAS_URL,{action:'getCustomers'}),
+      fetchGAS(GAS_URL,{action:'getRecords'}),
+      fetchGAS(GAS_URL,{action:'getPlans',year:currentYear}),
+    ]);
+    customers=Array.isArray(newCustomers)?newCustomers:customers;
+    allRecords=Array.isArray(newRecords)?newRecords:allRecords;
     buildPlanData(planResult);
-  }catch(e){ console.error('plans error:',e); planData={}; }
+    saveCache();
+  }catch(e){
+    if(!hasCacheData){
+      customers=[];allRecords=[];planData={};
+    }
+  }
 
-  console.log('rendering list...');
   renderList('');
   if(currentCustomer) renderDetail(currentCustomer);
+  const ss=document.getElementById('sync-status');
+  if(ss) ss.textContent='';
 }
 
 function buildPlanData(planResult){
