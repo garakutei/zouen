@@ -613,9 +613,15 @@ async function exportYearlyPlan(){
   const status=document.getElementById('export-status');
   status.style.display='block';
   status.style.color='#3B6D11';
-  status.textContent='📊 スプレッドシートに年間計画表を作成中...';
+  status.textContent='📊 スプレッドシートに年間計画表を作成中...（しばらくお待ちください）';
   try{
-    const result=await fetchGAS(GAS_URL,{action:'exportYearlyPlan',year});
+    // Excelエクスポートは処理に時間がかかるため直接fetch
+    const url=GAS_URL+'?action=exportYearlyPlan&year='+encodeURIComponent(year);
+    const res=await Promise.race([
+      fetch(url),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('タイムアウト。スプレッドシートを直接確認してください')),90000))
+    ]);
+    const result=await res.json();
     if(result&&result.success){
       status.textContent='✓ 作成完了！下のリンクからダウンロードしてください。';
       status.innerHTML='✓ 作成完了！<br><a href="'+result.url+'" target="_blank" style="color:#185FA5;font-weight:600">📥 '+result.year+'年度_年間計画表.xlsx をダウンロード</a>';
@@ -649,8 +655,8 @@ function fetchGAS(url,params){
     setTimeout(()=>{
       if(done) return;done=true;delete window[cbName];
       try{document.body.removeChild(script);}catch(e){}
-      reject(new Error('タイムアウト（15秒）'));
-    },15000);
+      reject(new Error('タイムアウト（60秒）'));
+    },60000);
     script.src=url+'?'+qs;
     document.body.appendChild(script);
   });
