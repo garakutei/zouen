@@ -956,6 +956,23 @@ function renderDetail(name){
           if(i>0) html+='<div style="border-top:1px solid rgba(0,0,0,0.08);margin:6px 0"></div>';
           html+='<div>作業内容：<strong>'+det.作業内容+'</strong></div>';
           if(det.注意事項) html+='<div style="margin-top:3px;color:#854F0B">⚠ 注意：'+det.注意事項+'</div>';
+          // 同じ作業内容の平均実績を表示
+          const t=det.作業内容;
+          const typeSites=cSites.filter(s=>s.t===t);
+          if(typeSites.length>0){
+            const stays=typeSites.map(s=>siteStayMin(s));
+            const wCounts=typeSites.map(s=>s.workers.length);
+            const totals=typeSites.map(s=>s.workers.reduce((a,w)=>a+w.min,0));
+            const avgStay=Math.round(stays.reduce((a,b)=>a+b,0)/typeSites.length);
+            const avgWorkers=(wCounts.reduce((a,b)=>a+b,0)/typeSites.length).toFixed(1);
+            const avgTotal=Math.round(totals.reduce((a,b)=>a+b,0)/typeSites.length);
+            html+='<div style="margin-top:5px;font-size:11px;color:#555">'+
+              '📊 '+typeSites.length+'現場の平均　'+
+              '滞在：<strong>'+fmtH(avgStay)+'</strong>　'+
+              '人数：<strong>'+avgWorkers+'人</strong>　'+
+              '合計：<strong>'+fmtH(avgTotal)+'</strong>'+
+            '</div>';
+          }
         });
       }
       html+='</div>';
@@ -971,31 +988,56 @@ function renderRecords(name,period){
   const cRec=allRecords.filter(r=>r['お客様']===name);
   let sites=groupBySite(cRec);
   let label='全作業記録（3年分）';
+  let filterTypes=null; // 絞り込む作業内容（nullなら全件）
+
   if(period){
-    sites=sites.filter(s=>getPeriod(s.d)===period);
-    if(period==='8a') label='8月前半（お盆前）の記録';
-    else if(period==='8b') label='8月後半（お盆後）の記録';
-    else{const mi=MNUMS.indexOf(Number(period));if(mi>=0)label=MONTHS[mi]+'の記録';}
+    // その月の計画作業内容を取得
+    const dets=getPlanDetails(name,period);
+    const planTypes=dets
+      .filter(d=>(d.作業内容||'').trim()!=='スキップ')
+      .map(d=>d.作業内容);
+
+    if(planTypes.length>0){
+      // 計画に作業内容がある → 同じ作業内容の記録を全月分表示
+      filterTypes=planTypes;
+      sites=sites.filter(s=>filterTypes.includes(s.t));
+      const typeLabel=planTypes.join('・');
+      if(period==='8a') label='8月前半の計画：'+typeLabel+'　（全期間の記録）';
+      else if(period==='8b') label='8月後半の計画：'+typeLabel+'　（全期間の記録）';
+      else{
+        const mi=MNUMS.indexOf(Number(period));
+        const mLabel=mi>=0?MONTHS[mi]:period+'月';
+        label=mLabel+'の計画：'+typeLabel+'　（全期間の記録）';
+      }
+    } else {
+      // 計画に作業内容がない → その月の記録のみ表示
+      sites=sites.filter(s=>getPeriod(s.d)===period);
+      if(period==='8a') label='8月前半（お盆前）の記録';
+      else if(period==='8b') label='8月後半（お盆後）の記録';
+      else{const mi=MNUMS.indexOf(Number(period));if(mi>=0)label=MONTHS[mi]+'の記録';}
+    }
   }
+
   document.getElementById('detail-records').innerHTML=
-    `<div style="font-size:11px;color:#888;margin-bottom:10px;font-weight:600">${label}（${sites.length}現場）</div>`+
+    '<div style="font-size:11px;color:#888;margin-bottom:10px;font-weight:600">'+label+'（'+sites.length+'現場）</div>'+
     (sites.length===0?'<div style="font-size:12px;color:#aaa;text-align:center;padding:1rem">記録がありません</div>':
     sites.map(s=>{
       const stay=siteStayMin(s);
-      const chips=s.workers.map(w=>`<span class="worker-chip">${w.who}　${fmtH(w.min)}</span>`).join('');
-      return `<div class="site-group">
-        <div class="site-head">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span class="badge bg">${s.t}</span>
-              <span style="font-size:12px;font-weight:600">${s.d}</span>
-              <span style="font-size:11px;color:#888">${s.workers.length}人　滞在${fmtH(stay)}</span>
-            </div>
-            ${s.note?`<span style="font-size:11px;color:#999">${s.note}</span>`:''}
-          </div>
-        </div>
-        <div style="padding:8px 12px;display:flex;flex-wrap:wrap">${chips}</div>
-      </div>`;
+      const totalWork=s.workers.reduce((a,w)=>a+w.min,0);
+      const chips=s.workers.map(w=>'<span class="worker-chip">'+w.who+'　'+fmtH(w.min)+'</span>').join('');
+      return '<div class="site-group">'+
+        '<div class="site-head">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+              '<span class="badge bg">'+s.t+'</span>'+
+              '<span style="font-size:12px;font-weight:600">'+s.d+'</span>'+
+              '<span style="font-size:11px;color:#888">'+s.workers.length+'人　滞在'+fmtH(stay)+'　合計'+fmtH(totalWork)+'</span>'+
+            '</div>'+
+            (s.note?'<span style="font-size:11px;color:#999">'+s.note+'</span>':'')+
+          '</div>'+
+        '</div>'+
+        '<div style="padding:8px 12px;display:flex;flex-wrap:wrap">'+chips+'</div>'+
+      '</div>';
     }).join(''));
 }
 
