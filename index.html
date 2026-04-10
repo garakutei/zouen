@@ -329,22 +329,14 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
         <button class="btn" style="width:100%" onclick="refreshAll()">全データを再読み込み</button>
       </div>
       <div class="card">
-        <div style="font-size:13px;font-weight:600;margin-bottom:4px">年間計画表のダウンロード</div>
-        <div style="font-size:11px;color:#888;margin-bottom:10px">スプレッドシートにシートを作成してExcelでダウンロードします</div>
-        <div class="frow">
-          <div>
-            <div class="flabel">年度</div>
-            <select id="export-year" style="width:100%">
-              <option value="2025">2025年度</option>
-              <option value="2026" selected>2026年度</option>
-              <option value="2027">2027年度</option>
-            </select>
-          </div>
-          <div style="display:flex;align-items:flex-end">
-            <button class="btn btnp" style="width:100%" onclick="exportYearlyPlan()">📥 ダウンロード</button>
-          </div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px">📊 年間計画表のダウンロード</div>
+        <div style="font-size:12px;color:#555;line-height:1.8">
+          Apps Scriptから手動で実行してください。<br>
+          1. スプレッドシート →「拡張機能」→「Apps Script」<br>
+          2. 関数を「<strong>exportYearlyPlan</strong>」に選択して▶ 実行<br>
+          3. スプレッドシートに「年度_年間計画表」シートが作成される<br>
+          4.「ファイル」→「ダウンロード」→「Microsoft Excel」
         </div>
-        <div id="export-status" style="font-size:12px;margin-top:8px;display:none"></div>
       </div>
       <div class="card">
         <div id="mode-display" style="font-size:12px;color:#888;margin-bottom:8px"></div>
