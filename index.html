@@ -267,20 +267,33 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
       <div class="plan-box">
         <div class="frow">
           <div><div class="flabel">作業日</div><input type="date" id="plan-date" onchange="renderNearList();renderVisitList()"/></div>
+          <div><div class="flabel">当日の作業人数</div>
+            <select id="plan-workers" onchange="renderNearList();renderVisitList()">
+              <option value="1">1人</option><option value="2" selected>2人</option>
+              <option value="3">3人</option><option value="4">4人</option><option value="5">5人</option>
+            </select>
+          </div>
+        </div>
+        <div class="frow">
           <div><div class="flabel">開始時刻</div>
             <select id="plan-start">
               <option value="420">7:00</option><option value="450">7:30</option>
               <option value="480" selected>8:00</option><option value="510">8:30</option><option value="540">9:00</option>
             </select>
           </div>
+          <div><div class="flabel">終了時刻</div>
+            <select id="plan-end">
+              <option value="900">15:00</option><option value="930">15:30</option>
+              <option value="960">16:00</option><option value="990">16:30</option>
+              <option value="1020" selected>17:00</option><option value="1050">17:30</option>
+              <option value="1080">18:00</option>
+            </select>
+          </div>
         </div>
         <div class="frow">
           <div><div class="flabel">出発地</div><input type="text" id="plan-base" value="阿賀野市" oninput="renderNearList()" placeholder="例：阿賀野市"/></div>
-          <div><div class="flabel">当日の作業人数</div>
-            <select id="plan-workers" onchange="renderNearList();renderVisitList()">
-              <option value="1">1人</option><option value="2" selected>2人</option>
-              <option value="3">3人</option><option value="4">4人</option><option value="5">5人</option>
-            </select>
+          <div style="display:flex;align-items:flex-end">
+            <div id="plan-time-info" style="font-size:12px;color:#3B6D11;padding-bottom:2px"></div>
           </div>
         </div>
         <div class="slabel" style="margin-top:4px">今月予定のお客様 <span style="font-weight:400;color:#aaa">（出発地に近い順）</span></div>
@@ -314,6 +327,24 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3B6D11;box-sh
       <div class="card">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px">データ同期</div>
         <button class="btn" style="width:100%" onclick="refreshAll()">全データを再読み込み</button>
+      </div>
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">年間計画表のダウンロード</div>
+        <div style="font-size:11px;color:#888;margin-bottom:10px">スプレッドシートにシートを作成してExcelでダウンロードします</div>
+        <div class="frow">
+          <div>
+            <div class="flabel">年度</div>
+            <select id="export-year" style="width:100%">
+              <option value="2025">2025年度</option>
+              <option value="2026" selected>2026年度</option>
+              <option value="2027">2027年度</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn btnp" style="width:100%" onclick="exportYearlyPlan()">📥 ダウンロード</button>
+          </div>
+        </div>
+        <div id="export-status" style="font-size:12px;margin-top:8px;display:none"></div>
       </div>
       <div class="card">
         <div id="mode-display" style="font-size:12px;color:#888;margin-bottom:8px"></div>
@@ -576,6 +607,26 @@ async function connectGAS(){
 function useDemoMode(){DEMO_MODE=true;GAS_URL='';startApp();}
 function showConnectError(msg){const el=document.getElementById('connect-error');el.textContent=msg;el.style.display='block';}
 function goSetup(){document.getElementById('main-screen').style.display='none';document.getElementById('setup-screen').style.display='flex';}
+
+async function exportYearlyPlan(){
+  const year=document.getElementById('export-year').value;
+  const status=document.getElementById('export-status');
+  status.style.display='block';
+  status.style.color='#3B6D11';
+  status.textContent='📊 スプレッドシートに年間計画表を作成中...';
+  try{
+    const result=await fetchGAS(GAS_URL,{action:'exportYearlyPlan',year});
+    if(result&&result.success){
+      status.textContent='✓ 作成完了！下のリンクからダウンロードしてください。';
+      status.innerHTML='✓ 作成完了！<br><a href="'+result.url+'" target="_blank" style="color:#185FA5;font-weight:600">📥 '+result.year+'年度_年間計画表.xlsx をダウンロード</a>';
+    } else {
+      throw new Error(result&&result.error?result.error:'作成できませんでした');
+    }
+  }catch(e){
+    status.style.color='#A32D2D';
+    status.textContent='⚠ エラー：'+e.message;
+  }
+}
 function updateURL(){const url=document.getElementById('new-url-input').value.trim();if(url){GAS_URL=url;localStorage.setItem('gasUrl',url);}DEMO_MODE=false;refreshAll();}
 
 // JSONP通信（Googleサイト埋め込み対応）
@@ -717,7 +768,7 @@ function isSkipped(name, monthKey){
 
 window.onload=()=>{
   // GASのURLを直接埋め込み（自動接続）
-  const FIXED_URL='https://script.google.com/macros/s/AKfycbxkkGGj84vkfcDZFJxdjdDCbVu6V5M4qyyqS-fbYqV9qD3FrhH143rWbT5RVr_Iw6dm/exec';
+  const FIXED_URL='https://script.google.com/macros/s/AKfycbwRvIPI7aMQdxAHGNd-H9wOj00WyP0DUpmyp_VYjWi0v5jyp0QJA_vq8T6YYwtxk4L6/exec';
   GAS_URL=FIXED_URL;
   localStorage.setItem('gasUrl',FIXED_URL);
   DEMO_MODE=false;
@@ -1326,6 +1377,18 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('.cust-search')) document.getElementById('other-dropdown')?.classList.remove('open');
 });
 
+function moveVisit(id, dir){
+  const idx=visitItems.findIndex(v=>v.id===id);
+  if(idx<0) return;
+  const newIdx=idx+dir;
+  if(newIdx<0||newIdx>=visitItems.length) return;
+  // 入れ替え
+  const tmp=visitItems[idx];
+  visitItems[idx]=visitItems[newIdx];
+  visitItems[newIdx]=tmp;
+  renderVisitList();
+}
+
 function renderVisitList(){
   const workers=parseInt(document.getElementById('plan-workers')?.value)||2;
   const el=document.getElementById('visit-list');
@@ -1341,7 +1404,11 @@ function renderVisitList(){
       :'<span style="color:#854F0B">実績データなし。目安時間を手入力してください</span>';
     return `<div class="visit-item">
       <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
-        <div class="route-num" style="margin-top:3px">${i+1}</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;margin-top:2px">
+          <div class="route-num">${i+1}</div>
+          <button class="btn" onclick="moveVisit(${v.id},-1)" style="padding:2px 7px;font-size:13px;color:#888;border-color:#eee;${i===0?'opacity:0.3;pointer-events:none':''}" title="上へ">▲</button>
+          <button class="btn" onclick="moveVisit(${v.id},1)" style="padding:2px 7px;font-size:13px;color:#888;border-color:#eee;${i===visitItems.length-1?'opacity:0.3;pointer-events:none':''}" title="下へ">▼</button>
+        </div>
         <div class="visit-selects">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
             <div>
@@ -1385,60 +1452,92 @@ function renderVisitList(){
 function generatePlan(){
   const date=document.getElementById('plan-date').value||'（日付未設定）';
   const startMin=parseInt(document.getElementById('plan-start').value);
+  const endMin=parseInt(document.getElementById('plan-end')?.value||'1020');
   const base=document.getElementById('plan-base')?.value||'阿賀野市';
   const workers=parseInt(document.getElementById('plan-workers').value);
   if(!visitItems.length){alert('訪問先を追加してください');return;}
+  const totalAvail=endMin-startMin;
+
   // 出発地から近い順にソート
   const visitCustomers=visitItems.map(v=>customers.find(c=>c['お客様名']===v.customer)).filter(Boolean);
   const sortedCustomers=sortByDistance(visitCustomers);
   const sorted=sortedCustomers.map(c=>visitItems.find(v=>v.customer===c['お客様名'])).filter(Boolean);
   const TRAVEL=20;
   const wTags=Array.from({length:workers},(_,i)=>
-    `<span class="worker-tag" style="background:${WCOLORS[i%5]};color:${WTEXTS[i%5]}">作業者${i+1}</span>`).join('');
+    '<span class="worker-tag" style="background:'+WCOLORS[i%5]+';color:'+WTEXTS[i%5]+'">作業者'+(i+1)+'</span>').join('');
+
   let cursor=startMin;
   const rows=sorted.map((v,i)=>{
     const avg=getAvgStay(v.customer,v.type);
-    const planned=avg>0?Math.ceil(avg/workers/10)*10:0;
-    const stayMin=v.useOverride?(v.overrideH*60+v.overrideM):planned;
-    const arrive=fmtClock(cursor),leave=fmtClock(cursor+stayMin);
+    const pl=avg>0?Math.ceil(avg/workers/10)*10:0;
+    const stayMin=v.useOverride?(v.overrideH*60+v.overrideM):pl;
+    const arrive=fmtClock(cursor);
+    const leave=fmtClock(cursor+stayMin);
+    const overTime=cursor+stayMin>endMin; // 終了時刻を超えているか
     cursor+=stayMin+TRAVEL;
-    const timeNote=v.useOverride?'手動入力':(avg>0?`実績平均${fmtH(avg)}÷${workers}人`:'手動入力');
-    return {v,stayMin,arrive,leave,order:i+1,timeNote};
+    const timeNote=v.useOverride?'手動入力':(avg>0?'実績平均'+fmtH(avg)+'÷'+workers+'人':'手動入力');
+    return {v,stayMin,arrive,leave,order:i+1,timeNote,overTime};
   });
-  let html=`<div class="card">
-    <div style="font-size:13px;font-weight:600;margin-bottom:4px">${date}　作業計画案</div>
-    <div style="font-size:11px;color:#888;margin-bottom:12px">出発：${base}　${workers}人　移動目安：${TRAVEL}分/件</div>`;
-  rows.forEach(row=>{
+
+  // 終了時刻に収まる件数を計算
+  let simCursor=startMin,fitsCount=0;
+  sorted.forEach(v=>{
+    const avg=getAvgStay(v.customer,v.type);
+    const pl=avg>0?Math.ceil(avg/workers/10)*10:0;
+    const stayMin=v.useOverride?(v.overrideH*60+v.overrideM):pl;
+    if(simCursor+stayMin<=endMin){fitsCount++;simCursor+=stayMin+TRAVEL;}
+  });
+  const overCount=sorted.length-fitsCount;
+
+  let html='<div class="card">';
+  html+='<div style="font-size:13px;font-weight:600;margin-bottom:4px">'+date+'　作業計画案</div>';
+  html+='<div style="font-size:11px;color:#888;margin-bottom:8px">出発：'+base+'　'+workers+'人　移動目安：'+TRAVEL+'分/件　終了目標：'+fmtClock(endMin)+'</div>';
+
+  // 時間超過の警告
+  if(overCount>0){
+    html+='<div class="info-box warn" style="margin-bottom:10px">⚠ '+overCount+'件が終了時刻（'+fmtClock(endMin)+'）を超えます。訪問先を減らすか目安時間を調整してください。</div>';
+  } else {
+    html+='<div class="info-box" style="margin-bottom:10px">✓ 全'+sorted.length+'件が'+fmtClock(endMin)+'までに完了できる見込みです。</div>';
+  }
+
+  rows.forEach(function(row){
     const cData=customers.find(c=>c['お客様名']===row.v.customer)||{};
     const tel=cData['tel1']||cData['tel2']||'';
-    html+=`<div class="sched-card">
-      <div class="sched-head">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="route-num">${row.order}</div>
-          <div>
-            <div style="font-weight:600;font-size:13px">${row.v.customer}</div>
-            <div style="font-size:11px;color:#888">${cData['住所']||''}　${getDistText(cData['住所']||'')}</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span class="badge bg">${row.v.type}</span>
-          ${tel?`<a class="btn btnsm btn-call" href="tel:${tel}" style="text-decoration:none">📞</a>`:''}
-        </div>
-      </div>
-      <div class="sched-body">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <div style="font-size:15px;font-weight:700">${row.arrive} 〜 ${row.leave}</div>
-          <div style="font-size:11px;color:#888">滞在${fmtH(row.stayMin)}（${row.timeNote}）</div>
-        </div>
-        <div style="margin-top:7px">${wTags}</div>
-      </div>
-    </div>`;
+    const addr=cData['住所']||'';
+    const dist=getDistText(addr)||'';
+    // Googleマップナビリンク（住所から）
+    const mapUrl=addr?'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(addr):'';
+    const borderColor=row.overTime?'#FAC775':'#e8e8e4';
+    const headBg=row.overTime?'#FFF3CD':'#f9f9f7';
+
+    html+='<div class="sched-card" style="border-color:'+borderColor+'">';
+    html+='<div class="sched-head" style="background:'+headBg+'">';
+    html+='<div style="display:flex;align-items:center;gap:8px">';
+    html+='<div class="route-num">'+(row.overTime?'⚠':row.order)+'</div>';
+    html+='<div>';
+    html+='<div style="font-weight:600;font-size:13px">'+row.v.customer+'</div>';
+    if(addr&&mapUrl){
+      html+='<a href="'+mapUrl+'" target="_blank" style="font-size:11px;color:#185FA5;text-decoration:none">📍 '+addr+(dist?' ('+dist+')':'')+'</a>';
+    } else {
+      html+='<div style="font-size:11px;color:#888">'+addr+'</div>';
+    }
+    html+='</div></div>';
+    html+='<div style="display:flex;align-items:center;gap:6px">';
+    html+='<span class="badge bg">'+row.v.type+'</span>';
+    if(tel) html+='<a class="btn btnsm btn-call" href="tel:'+tel+'" style="text-decoration:none">📞</a>';
+    html+='</div></div>';
+    html+='<div class="sched-body">';
+    html+='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+    html+='<div style="font-size:15px;font-weight:700;color:'+(row.overTime?'#854F0B':'#1a1a1a')+'">'+row.arrive+' 〜 '+row.leave+'</div>';
+    html+='<div style="font-size:11px;color:#888">滞在'+fmtH(row.stayMin)+'（'+row.timeNote+'）</div>';
+    if(row.overTime) html+='<span class="badge ba">終了時刻超過</span>';
+    html+='</div>';
+    html+='<div style="margin-top:7px">'+wTags+'</div>';
+    html+='</div></div>';
   });
-  html+=`<div style="text-align:right;font-size:12px;color:#888;margin-top:8px">予定終了：${fmtClock(cursor-TRAVEL)}頃</div></div>
-  <div style="font-size:11px;color:#aaa;padding-bottom:2rem">
-    ※ ルートは出発地からの距離順による簡易案です。実際の道路状況はGoogleマップでご確認ください。
-  </div>`;
-  document.getElementById('plan-result').innerHTML=html;
+
+  html+='<div style="text-align:right;font-size:12px;color:#888;margin-top:8px">予定終了：'+fmtClock(cursor-TRAVEL)+'頃</div></div>';
+  html+='<div style="font-size:11px;color:#aaa;padding-bottom:2rem">※ ルートは出発地からの距離順による簡易案です。住所をタップするとGoogleマップでナビが開きます。</div>';
 }
 </script>
 </body>
