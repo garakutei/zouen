@@ -814,7 +814,8 @@ function getPlanDetail(name, monthKey){
 function isSkipped(name, monthKey){
   const details=getPlanDetails(name, monthKey);
   if(!details.length) return false;
-  return details.every(d=>(d.作業内容||'').trim()==='スキップ');
+  // 年度別に1件でもスキップがあれば月全体をスキップ
+  return details.some(d=>(d.作業内容||'').trim()==='スキップ'&&d.isOverride);
 }
 
 window.onload=()=>{
